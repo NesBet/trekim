@@ -18,6 +18,7 @@ interface TransactionData {
   reference: string;
   amount: number;
   status: string;
+  channel: string;
   metadata: Record<string, unknown>;
   paid_at: string | null;
   created_at: string;
@@ -109,6 +110,22 @@ export async function initiateSTKPush(params: {
       pin: "STK_PUSH",
     }),
   });
+}
+
+export function mapPaystackChannel(channel: string): "CARD" | "MPESA" {
+  switch (channel) {
+    case "mobile_money":
+    case "mpesa":
+      return "MPESA";
+    case "card":
+    case "bank":
+    case "ussd":
+    case "qr":
+    case "bank_transfer":
+    case "dedicated_nuban":
+    default:
+      return "CARD";
+  }
 }
 
 export function verifyWebhookSignature(

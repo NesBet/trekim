@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { verifyTransaction } from "@/lib/paystack";
+import { verifyTransaction, mapPaystackChannel } from "@/lib/paystack";
 
 export async function POST(request: Request) {
   try {
@@ -15,8 +15,9 @@ export async function POST(request: Request) {
     }
 
     const result = await verifyTransaction(reference);
+    const { status, channel } = result.data;
 
-    if (result.data.status === "success") {
+    if (status === "success") {
       const payment = await prisma.payment.findUnique({
         where: { reference },
         include: { order: true },
@@ -27,6 +28,7 @@ export async function POST(request: Request) {
           where: { reference },
           data: {
             status: "SUCCESS",
+            method: mapPaystackChannel(channel),
             paidAt: new Date(),
           },
         });
@@ -47,7 +49,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ status: "success" });
     }
 
-    return NextResponse.json({ status: result.data.status });
+    await prisma.payment.updateMany({
+      where: { reference, status: "PENDING" },
+      data: { status: "FAILED" },
+    });
+
+    return NextResponse.json({ status });
   } catch (error) {
     console.error("Paystack verify error:", error);
     return NextResponse.json(
