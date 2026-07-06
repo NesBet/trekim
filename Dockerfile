@@ -5,7 +5,7 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 COPY node_modules ./node_modules
 COPY . .
-RUN ./node_modules/.bin/prisma generate
+#RUN ./node_modules/.bin/prisma generate
 RUN npm run build
 
 FROM base AS runner
