@@ -61,7 +61,15 @@ export async function POST(request: Request) {
 
     const body = await request.json();
 
-    const { items, customerId, deliveryLocation } = body;
+    const {
+      items,
+      customerId,
+      deliveryLocation,
+      paymentMethod,
+      customerName,
+      customerPhone,
+      cashAmount,
+    } = body;
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json(
@@ -99,12 +107,18 @@ export async function POST(request: Request) {
 
     const orderNumber = generateOrderNumber();
 
+    const isCash = paymentMethod === "CASH";
+    const isSalesperson = session.role !== "CUSTOMER";
+
     const order = await prisma.order.create({
       data: {
         orderNumber,
-        customerId: customerId || session.userId,
-        salespersonId: session.role !== "CUSTOMER" ? session.userId : null,
+        customerId: customerId || (session.role === "CUSTOMER" ? session.userId : null),
+        customerName: customerName || null,
+        customerPhone: customerPhone || null,
+        salespersonId: isSalesperson ? session.userId : null,
         total,
+        status: isCash ? "COMPLETED" : "PENDING",
         deliveryLocation: deliveryLocation || null,
         items: { create: orderItems },
       },
@@ -122,6 +136,31 @@ export async function POST(request: Request) {
       });
     }
 
+    let payment = null;
+    let change = 0;
+
+    if (isCash) {
+      const ref = `CASH-${orderNumber}`;
+      change = (cashAmount || 0) - total;
+      payment = await prisma.payment.create({
+        data: {
+          orderId: order.id,
+          amount: total,
+          reference: ref,
+          method: "CASH",
+          status: "SUCCESS",
+          paidAt: new Date(),
+        },
+      });
+      await prisma.auditLog.create({
+        data: {
+          userId: session.userId,
+          action: "CASH_PAYMENT",
+          details: `Cash payment for ${orderNumber}. Amount: KES ${total}, Tendered: KES ${cashAmount || 0}, Change: KES ${change}`,
+        },
+      });
+    }
+
     if (session.role === "CUSTOMER") {
       await prisma.cartItem.deleteMany({
         where: { userId: session.userId },
@@ -132,11 +171,14 @@ export async function POST(request: Request) {
       data: {
         userId: session.userId,
         action: "CREATE_ORDER",
-        details: `Order ${orderNumber} created. Total: KES ${total}`,
+        details: `Order ${orderNumber} created. Total: KES ${total}${isCash ? ". Cash payment completed." : ""}`,
       },
     });
 
-    return NextResponse.json({ order }, { status: 201 });
+    return NextResponse.json(
+      { order, payment, change: change > 0 ? change : 0 },
+      { status: 201 }
+    );
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Failed to create order";

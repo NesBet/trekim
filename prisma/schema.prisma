@@ -74,6 +74,8 @@ model Order {
   id               String      @id @default(cuid())
   orderNumber      String      @unique
   customerId       String?
+  customerName     String?
+  customerPhone    String?
   salespersonId    String?
   status           OrderStatus @default(PENDING)
   total            Float

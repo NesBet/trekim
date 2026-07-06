@@ -42,11 +42,18 @@ export function Navbar() {
   }
 
   if (user?.role === "SALESPERSON" || user?.role === "ADMIN") {
-    navLinks.push({
-      href: "/dashboard",
-      label: "Dashboard",
-      icon: LayoutDashboard,
-    });
+    navLinks.push(
+      {
+        href: "/dashboard/pos",
+        label: "POS",
+        icon: ShoppingCart,
+      },
+      {
+        href: "/dashboard",
+        label: "Dashboard",
+        icon: LayoutDashboard,
+      }
+    );
   }
 
   if (user?.role === "CUSTOMER") {

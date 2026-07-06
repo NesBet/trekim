@@ -1,8 +1,8 @@
 "use client";
 
-import { Suspense, useState, useEffect } from "react";
+import { Suspense, useState, useEffect, useRef } from "react";
 import { ProductCard } from "@/components/products/product-card";
-import { Search } from "lucide-react";
+import { Search, ChevronDown, Check } from "lucide-react";
 import toast from "react-hot-toast";
 import { useAuth } from "@/lib/auth-context";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -25,6 +25,8 @@ function InventoryContent() {
   const { user } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const allCategories = Array.from(
     new Set(products.map((p) => p.category).filter(Boolean))
@@ -39,6 +41,16 @@ function InventoryContent() {
       if (match) setSelectedCategory(match);
     }
   }, [searchParams, allCategories]);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
 
   useEffect(() => {
     fetchProducts();
@@ -111,7 +123,7 @@ function InventoryContent() {
 
   return (
     <>
-      <div className="flex flex-col sm:flex-row gap-4 mb-8">
+      <div className="flex flex-col sm:flex-row gap-4 mb-6">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <input
@@ -122,30 +134,55 @@ function InventoryContent() {
             className="w-full h-10 rounded-lg border border-input bg-background pl-10 pr-4 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           />
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div className="relative" ref={dropdownRef}>
           <button
-            onClick={() => setSelectedCategory(null)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              !selectedCategory
-                ? "bg-trekim-500 text-black"
-                : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
-            }`}
+            onClick={() => setDropdownOpen(!dropdownOpen)}
+            className="flex items-center gap-2 h-10 px-4 rounded-lg border border-input bg-background text-sm font-medium hover:bg-secondary transition-colors min-w-[140px]"
           >
-            All
-          </button>
-          {allCategories.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setSelectedCategory(cat)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                selectedCategory === cat
-                  ? "bg-trekim-500 text-black"
-                  : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+            <span className="flex-1 text-left truncate">
+              {selectedCategory || "All Categories"}
+            </span>
+            <ChevronDown
+              className={`h-4 w-4 text-muted-foreground transition-transform ${
+                dropdownOpen ? "rotate-180" : ""
               }`}
-            >
-              {cat}
-            </button>
-          ))}
+            />
+          </button>
+          {dropdownOpen && (
+            <div className="absolute z-50 top-full mt-1 left-0 w-full rounded-lg border bg-background shadow-lg animate-fade-in">
+              <button
+                onClick={() => {
+                  setSelectedCategory(null);
+                  setDropdownOpen(false);
+                }}
+                className={`flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-secondary transition-colors first:rounded-t-lg last:rounded-b-lg ${
+                  !selectedCategory ? "font-medium text-trekim-500" : ""
+                }`}
+              >
+                <span className="flex-1 text-left">All Categories</span>
+                {!selectedCategory && (
+                  <Check className="h-4 w-4 text-trekim-500" />
+                )}
+              </button>
+              {allCategories.map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => {
+                    setSelectedCategory(cat);
+                    setDropdownOpen(false);
+                  }}
+                  className={`flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-secondary transition-colors first:rounded-t-lg last:rounded-b-lg ${
+                    selectedCategory === cat ? "font-medium text-trekim-500" : ""
+                  }`}
+                >
+                  <span className="flex-1 text-left">{cat}</span>
+                  {selectedCategory === cat && (
+                    <Check className="h-4 w-4 text-trekim-500" />
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

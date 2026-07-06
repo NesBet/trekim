@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,8 @@ import {
   Package,
   Search,
   X,
-  Filter,
+  ChevronDown,
+  Check,
 } from "lucide-react";
 import Link from "next/link";
 import toast from "react-hot-toast";
@@ -45,6 +46,72 @@ const paymentStatusColors: Record<string, string> = {
   PENDING: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
   FAILED: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
 };
+
+function Dropdown({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  options: { value: string | null; label: string }[];
+  value: string | null;
+  onChange: (v: string | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const selected = options.find((o) => o.value === value);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-2 h-10 px-3 rounded-lg border border-input bg-background text-sm font-medium hover:bg-secondary transition-colors min-w-[160px]"
+      >
+        <span className="flex-1 text-left truncate">
+          {selected ? selected.label : label}
+        </span>
+        <ChevronDown
+          className={`h-4 w-4 text-muted-foreground transition-transform ${
+            open ? "rotate-180" : ""
+          }`}
+        />
+      </button>
+      {open && (
+        <div className="absolute z-50 top-full mt-1 w-full rounded-lg border bg-background shadow-lg animate-fade-in">
+          {options.map((opt) => (
+            <button
+              key={String(opt.value)}
+              onClick={() => {
+                onChange(opt.value);
+                setOpen(false);
+              }}
+              className={`flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-secondary transition-colors first:rounded-t-lg last:rounded-b-lg ${
+                value === opt.value ? "font-medium text-trekim-500" : ""
+              }`}
+            >
+              <span className="flex-1 text-left">{opt.label}</span>
+              {value === opt.value && (
+                <Check className="h-4 w-4 text-trekim-500" />
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function OrdersPage() {
   const { user, loading: authLoading } = useAuth();
@@ -138,8 +205,8 @@ export default function OrdersPage() {
         </Link>
       </div>
 
-      <div className="space-y-4 mb-6">
-        <div className="relative">
+      <div className="flex flex-col sm:flex-row gap-3 mb-6">
+        <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <input
             type="text"
@@ -157,60 +224,30 @@ export default function OrdersPage() {
             </button>
           )}
         </div>
-
-        <div className="flex flex-wrap gap-2 items-center">
-          <Filter className="h-4 w-4 text-muted-foreground" />
-          <span className="text-xs font-medium text-muted-foreground mr-1">Status:</span>
-          <button
-            onClick={() => setOrderStatus(null)}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-              !orderStatus
-                ? "bg-trekim-500 text-black"
-                : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
-            }`}
-          >
-            All
-          </button>
-          {ALL_STATUSES.map((s) => (
-            <button
-              key={s}
-              onClick={() => setOrderStatus(s === orderStatus ? null : s)}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                orderStatus === s
-                  ? "bg-trekim-500 text-black"
-                  : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
-              }`}
-            >
-              {s.charAt(0) + s.slice(1).toLowerCase()}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex flex-wrap gap-2 items-center">
-          <span className="text-xs font-medium text-muted-foreground mr-1">Payment:</span>
-          <button
-            onClick={() => setPayStatus(null)}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-              !payStatus
-                ? "bg-trekim-500 text-black"
-                : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
-            }`}
-          >
-            All
-          </button>
-          {["SUCCESS", "PENDING", "FAILED"].map((s) => (
-            <button
-              key={s}
-              onClick={() => setPayStatus(s === payStatus ? null : s)}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                payStatus === s
-                  ? "bg-trekim-500 text-black"
-                  : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
-              }`}
-            >
-              {s === "SUCCESS" ? "Paid" : s === "PENDING" ? "Pending" : "Failed"}
-            </button>
-          ))}
+        <div className="flex gap-2">
+          <Dropdown
+            label="Order Status"
+            options={[
+              { value: null, label: "All Statuses" },
+              ...ALL_STATUSES.map((s) => ({
+                value: s,
+                label: s.charAt(0) + s.slice(1).toLowerCase(),
+              })),
+            ]}
+            value={orderStatus}
+            onChange={setOrderStatus}
+          />
+          <Dropdown
+            label="Payment"
+            options={[
+              { value: null, label: "All Payments" },
+              { value: "SUCCESS", label: "Paid" },
+              { value: "PENDING", label: "Pending" },
+              { value: "FAILED", label: "Failed" },
+            ]}
+            value={payStatus}
+            onChange={setPayStatus}
+          />
         </div>
       </div>
 
