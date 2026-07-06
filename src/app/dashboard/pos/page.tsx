@@ -96,9 +96,9 @@ function StkWaitingOverlay({ onCancel }: { onCancel: () => void }) {
         <div className="space-y-2">
           <h3 className="text-xl font-bold">Waiting for Payment</h3>
           <p className="text-sm text-muted-foreground">
-            STK push sent to customer&apos;s phone.
+            A Paystack checkout page has been opened.
             <br />
-            Ask them to enter M-Pesa PIN to complete payment.
+            Complete payment there to confirm this order.
           </p>
         </div>
         <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
@@ -314,7 +314,13 @@ export default function POSPage() {
         throw new Error(stkErr.error || "STK push failed");
       }
 
+      const stkData = await stkRes.json();
       setStkOrderId(orderId);
+
+      if (stkData.authorizationUrl) {
+        window.open(stkData.authorizationUrl, "_blank");
+      }
+
       startPolling(orderId);
     } catch (err) {
       setStkState("failed");

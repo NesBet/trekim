@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
-import { initiateSTKPush } from "@/lib/paystack";
+import { initializeTransaction } from "@/lib/paystack";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
 const limiter = rateLimit({ interval: 60000, maxRequests: 10 });
@@ -29,9 +29,9 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { orderId, phone } = body;
 
-    if (!orderId || !phone) {
+    if (!orderId) {
       return NextResponse.json(
-        { error: "Order ID and phone number are required" },
+        { error: "Order ID is required" },
         { status: 400 }
       );
     }
@@ -59,30 +59,32 @@ export async function POST(request: Request) {
       );
     }
 
-    const reference = `TRK-${order.orderNumber}-${Date.now()}`;
+    const sessionUser = await prisma.user.findUnique({
+      where: { id: session.userId },
+    });
 
-    const result = await initiateSTKPush({
+    const result = await initializeTransaction({
+      email: sessionUser?.email || "payment@trekim.co.ke",
       amount: order.total,
-      phone,
-      reference,
       metadata: {
         orderId: order.id,
         orderNumber: order.orderNumber,
         userId: session.userId,
+        phone: phone || "",
       },
     });
 
     await prisma.payment.upsert({
       where: { orderId: order.id },
       update: {
-        reference,
+        reference: result.data.reference,
         method: "MPESA",
         status: "PENDING",
       },
       create: {
         orderId: order.id,
         amount: order.total,
-        reference,
+        reference: result.data.reference,
         method: "MPESA",
         status: "PENDING",
       },
@@ -92,15 +94,16 @@ export async function POST(request: Request) {
       data: {
         userId: session.userId,
         action: "STK_PUSH",
-        details: `STK push initiated for order ${order.orderNumber}. Phone: ${phone}, Reference: ${reference}`,
+        details: `M-Pesa payment initialized for order ${order.orderNumber}. Reference: ${result.data.reference}`,
       },
     });
 
     return NextResponse.json({
       success: true,
-      reference,
+      reference: result.data.reference,
+      authorizationUrl: result.data.authorization_url,
       orderId: order.id,
-      message: "STK push sent to customer's phone",
+      message: "Payment page opened. Complete payment on Paystack.",
     });
   } catch (error) {
     console.error("STK push error:", error);

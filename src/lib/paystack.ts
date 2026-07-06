@@ -27,13 +27,6 @@ interface TransactionData {
   } | null;
 }
 
-interface STKPushData {
-  amount: number;
-  reference: string;
-  status: string;
-  paid_at: string | null;
-}
-
 async function paystackFetch<T>(
   endpoint: string,
   options: RequestInit = {}
@@ -84,30 +77,6 @@ export async function verifyTransaction(reference: string) {
   return paystackFetch<TransactionData>(
     `/transaction/verify/${encodeURIComponent(reference)}`
   );
-}
-
-export async function initiateSTKPush(params: {
-  amount: number;
-  phone: string;
-  reference: string;
-  metadata?: Record<string, unknown>;
-}) {
-  const amountInKobo = Math.round(params.amount * 100);
-  const phone = params.phone.replace(/^0+/, "254").replace(/^\+254/, "254");
-
-  return paystackFetch("/charge", {
-    method: "POST",
-    body: JSON.stringify({
-      email: "payment@trekim.co.ke",
-      amount: amountInKobo,
-      reference: params.reference,
-      metadata: params.metadata,
-      mobile_money: {
-        phone,
-        provider: "mpesa",
-      },
-    }),
-  });
 }
 
 export function mapPaystackChannel(channel: string): "CARD" | "MPESA" {
