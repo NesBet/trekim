@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,10 @@ import {
   Package,
   ArrowLeft,
   CheckCircle,
+  XCircle,
+  Loader2,
+  RotateCcw,
+  RefreshCw,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
@@ -41,11 +45,79 @@ interface CartItem {
   quantity: number;
 }
 
+type StkState = "idle" | "waiting" | "success" | "failed";
+
+function ConfettiOverlay() {
+  const particles = useRef(
+    Array.from({ length: 50 }, (_, i) => ({
+      id: i,
+      left: Math.random() * 100,
+      delay: Math.random() * 2,
+      duration: 2 + Math.random() * 3,
+      color: ["#eab308", "#22c55e", "#3b82f6", "#ec4899", "#a855f7"][
+        Math.floor(Math.random() * 5)
+      ],
+      rotation: Math.random() * 360,
+      size: 6 + Math.random() * 8,
+    }))
+  );
+
+  return (
+    <div className="fixed inset-0 pointer-events-none z-[100] overflow-hidden">
+      {particles.current.map((p) => (
+        <div
+          key={p.id}
+          className="absolute top-0 animate-confetti"
+          style={{
+            left: `${p.left}%`,
+            animationDelay: `${p.delay}s`,
+            animationDuration: `${p.duration}s`,
+            width: `${p.size}px`,
+            height: `${p.size}px`,
+            backgroundColor: p.color,
+            borderRadius: Math.random() > 0.5 ? "50%" : "2px",
+            transform: `rotate(${p.rotation}deg)`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function StkWaitingOverlay({ onCancel }: { onCancel: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div className="bg-background rounded-2xl p-10 max-w-sm w-full mx-4 text-center space-y-6 animate-fade-in shadow-2xl border">
+        <div className="relative mx-auto w-24 h-24">
+          <div className="absolute inset-0 rounded-full border-4 border-muted" />
+          <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-trekim-500 animate-spin" />
+          <Smartphone className="absolute inset-0 m-auto h-10 w-10 text-trekim-500 animate-pulse" />
+        </div>
+        <div className="space-y-2">
+          <h3 className="text-xl font-bold">Waiting for Payment</h3>
+          <p className="text-sm text-muted-foreground">
+            STK push sent to customer&apos;s phone.
+            <br />
+            Ask them to enter M-Pesa PIN to complete payment.
+          </p>
+        </div>
+        <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+          <RefreshCw className="h-4 w-4 animate-spin" />
+          <span>Awaiting confirmation...</span>
+        </div>
+        <Button variant="ghost" size="sm" onClick={onCancel} className="text-muted-foreground">
+          Cancel
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export default function POSPage() {
   const { user } = useAuth();
   const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loadingProducts, setLoadingProducts] = useState(true);
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [items, setItems] = useState<CartItem[]>([]);
@@ -60,10 +132,19 @@ export default function POSPage() {
     change: number;
     total: number;
   } | null>(null);
+
+  const [stkState, setStkState] = useState<StkState>("idle");
+  const [stkOrderId, setStkOrderId] = useState<string | null>(null);
   const [stkPhone, setStkPhone] = useState("");
+  const [stkError, setStkError] = useState("");
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollingCountRef = useRef(0);
 
   useEffect(() => {
     fetchProducts();
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
   }, []);
 
   const fetchProducts = async () => {
@@ -75,7 +156,7 @@ export default function POSPage() {
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to load products");
     } finally {
-      setLoading(false);
+      setLoadingProducts(false);
     }
   };
 
@@ -83,20 +164,15 @@ export default function POSPage() {
     new Set(products.map((p) => p.category).filter(Boolean))
   ) as string[];
 
-  const persistCart = (updated: CartItem[]) => {
-    setItems(updated);
-  };
-
   const addToCart = (product: Product, quantity: number) => {
     setItems((prev) => {
       const existing = prev.find((i) => i.productId === product.id);
       if (existing) {
-        const updated = prev.map((i) =>
+        return prev.map((i) =>
           i.productId === product.id
             ? { ...i, quantity: i.quantity + quantity }
             : i
         );
-        return updated;
       }
       return [
         ...prev,
@@ -122,7 +198,6 @@ export default function POSPage() {
           return item;
         })
         .filter(Boolean) as CartItem[];
-      persistCart(updated);
       return updated;
     });
   };
@@ -145,33 +220,112 @@ export default function POSPage() {
     return matchesSearch && matchesCategory;
   });
 
-  const handleSubmit = async () => {
-    if (items.length === 0) {
-      toast.error("Add at least one item to the order");
+  const stopPolling = useCallback(() => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+    pollingCountRef.current = 0;
+  }, []);
+
+  const startPolling = useCallback(
+    (orderId: string) => {
+      pollingCountRef.current = 0;
+      if (pollingRef.current) clearInterval(pollingRef.current);
+
+      pollingRef.current = setInterval(async () => {
+        pollingCountRef.current++;
+
+        if (pollingCountRef.current > 60) {
+          stopPolling();
+          setStkState("failed");
+          setStkError("Payment confirmation timed out. Please try again.");
+          return;
+        }
+
+        try {
+          const res = await fetch(`/api/orders/${orderId}`);
+          if (!res.ok) return;
+          const data = await res.json();
+
+          const paymentStatus = data.order?.payment?.status;
+
+          if (paymentStatus === "SUCCESS") {
+            stopPolling();
+            setStkState("success");
+          } else if (paymentStatus === "FAILED") {
+            stopPolling();
+            setStkState("failed");
+            setStkError("Payment was declined by customer or failed.");
+          }
+        } catch {
+          // continue polling
+        }
+      }, 2000);
+    },
+    [stopPolling]
+  );
+
+  const handleMpesaSubmit = async () => {
+    if (!validatePhone(stkPhone)) {
+      toast.error("Enter a valid Kenyan phone number (e.g., 0712345678)");
       return;
     }
-
-    if (!customerName.trim()) {
-      toast.error("Enter customer name");
-      return;
+    if (!customerPhone) {
+      setCustomerPhone(stkPhone);
     }
 
-    if (!paymentMethod) {
-      toast.error("Select a payment method");
-      return;
-    }
+    setSubmitting(true);
+    setStkState("waiting");
+    setStkError("");
 
-    if (paymentMethod === "MPESA") {
-      if (!validatePhone(stkPhone)) {
-        toast.error("Enter a valid Kenyan phone number (e.g., 0712345678)");
-        return;
+    try {
+      const res = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items: items.map((item) => ({
+            productId: item.productId,
+            quantity: item.quantity,
+          })),
+          paymentMethod: "MPESA",
+          customerName: customerName.trim(),
+          customerPhone: customerPhone.trim() || stkPhone,
+          deliveryLocation: "Walk-in",
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      const orderId = data.order.id;
+
+      const stkRes = await fetch("/api/paystack/stk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderId,
+          phone: stkPhone,
+        }),
+      });
+
+      if (!stkRes.ok) {
+        const stkErr = await stkRes.json();
+        throw new Error(stkErr.error || "STK push failed");
       }
-      if (!customerPhone) {
-        setCustomerPhone(stkPhone);
-      }
-    }
 
-    if (paymentMethod === "CASH" && tendered < total) {
+      setStkOrderId(orderId);
+      startPolling(orderId);
+    } catch (err) {
+      setStkState("failed");
+      setStkError(err instanceof Error ? err.message : "Failed to process payment");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleCashSubmit = async () => {
+    if (tendered < total) {
       toast.error("Amount tendered must be at least the total");
       return;
     }
@@ -186,10 +340,10 @@ export default function POSPage() {
             productId: item.productId,
             quantity: item.quantity,
           })),
-          paymentMethod,
+          paymentMethod: "CASH",
           customerName: customerName.trim(),
           customerPhone: customerPhone.trim() || null,
-          cashAmount: paymentMethod === "CASH" ? tendered : undefined,
+          cashAmount: tendered,
           deliveryLocation: "Walk-in",
         }),
       });
@@ -202,45 +356,51 @@ export default function POSPage() {
       setCustomerPhone("");
       setCashAmount("");
       setPaymentMethod(null);
-      setStkPhone("");
 
-      if (paymentMethod === "CASH") {
-        setResultData({
-          orderNumber: data.order.orderNumber,
-          change: data.change,
-          total,
-        });
-        setResultModal(true);
-        toast.success("Order completed!");
-      } else if (paymentMethod === "MPESA") {
-        const stkRes = await fetch("/api/paystack/stk", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            orderId: data.order.id,
-            phone: stkPhone,
-          }),
-        });
-
-        const stkData = await stkRes.json();
-        if (stkRes.ok) {
-          toast.success("STK Push sent to customer's phone");
-        } else {
-          toast.error(stkData.error || "STK push failed");
-        }
-
-        setResultModal(true);
-        setResultData({
-          orderNumber: data.order.orderNumber,
-          change: 0,
-          total,
-        });
-      }
+      setResultData({
+        orderNumber: data.order.orderNumber,
+        change: data.change,
+        total,
+      });
+      setResultModal(true);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to create order");
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleSubmit = async () => {
+    if (items.length === 0) {
+      toast.error("Add at least one item to the order");
+      return;
+    }
+    if (!customerName.trim()) {
+      toast.error("Enter customer name");
+      return;
+    }
+    if (!paymentMethod) {
+      toast.error("Select a payment method");
+      return;
+    }
+
+    if (paymentMethod === "CASH") {
+      await handleCashSubmit();
+    } else {
+      await handleMpesaSubmit();
+    }
+  };
+
+  const handleRetry = () => {
+    setStkState("idle");
+    setStkError("");
+    setStkOrderId(null);
+  };
+
+  const handleCancelWaiting = () => {
+    stopPolling();
+    setStkState("failed");
+    setStkError("STK push cancelled.");
   };
 
   return (
@@ -253,7 +413,6 @@ export default function POSPage() {
       </div>
 
       <div className="grid xl:grid-cols-3 gap-6">
-        {/* Left: Product selection */}
         <div className="xl:col-span-2 space-y-4">
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="relative flex-1">
@@ -268,7 +427,6 @@ export default function POSPage() {
             </div>
           </div>
 
-          {/* Category filter as dropdown */}
           <div className="flex gap-2 flex-wrap">
             <button
               onClick={() => setSelectedCategory(null)}
@@ -295,13 +453,10 @@ export default function POSPage() {
             ))}
           </div>
 
-          {loading ? (
+          {loadingProducts ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {[...Array(4)].map((_, i) => (
-                <div
-                  key={i}
-                  className="h-[200px] rounded-xl bg-secondary animate-pulse"
-                />
+                <div key={i} className="h-[200px] rounded-xl bg-secondary animate-pulse" />
               ))}
             </div>
           ) : filtered.length === 0 ? (
@@ -324,21 +479,12 @@ export default function POSPage() {
                         <Package className="h-6 w-6 text-trekim-500/50" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold truncate">
-                          {product.name}
-                        </h3>
-                        <p className="text-trekim-500 font-bold">
-                          {formatCurrency(product.price)}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Stock: {product.stock}
-                        </p>
+                        <h3 className="font-semibold truncate">{product.name}</h3>
+                        <p className="text-trekim-500 font-bold">{formatCurrency(product.price)}</p>
+                        <p className="text-xs text-muted-foreground">Stock: {product.stock}</p>
                       </div>
                       {!outOfStock && (
-                        <Button
-                          size="sm"
-                          onClick={() => addToCart(product, 1)}
-                        >
+                        <Button size="sm" onClick={() => addToCart(product, 1)}>
                           <Plus className="h-4 w-4" />
                         </Button>
                       )}
@@ -350,7 +496,6 @@ export default function POSPage() {
           )}
         </div>
 
-        {/* Right: Cart & Checkout */}
         <div className="space-y-4">
           <Card>
             <CardContent className="p-4 space-y-4">
@@ -360,60 +505,33 @@ export default function POSPage() {
                   Cart ({items.length})
                 </h2>
                 {items.length > 0 && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setItems([])}
-                    className="text-destructive"
-                  >
+                  <Button variant="ghost" size="sm" onClick={() => setItems([])} className="text-destructive">
                     Clear
                   </Button>
                 )}
               </div>
 
               {items.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-6">
-                  No items added yet
-                </p>
+                <p className="text-sm text-muted-foreground text-center py-6">No items added yet</p>
               ) : (
                 <div className="space-y-2 max-h-[300px] overflow-y-auto">
                   {items.map((item) => (
-                    <div
-                      key={item.productId}
-                      className="flex items-center gap-2 bg-secondary/50 rounded-lg p-2"
-                    >
+                    <div key={item.productId} className="flex items-center gap-2 bg-secondary/50 rounded-lg p-2">
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">
-                          {item.name}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {formatCurrency(item.price)} each
-                        </p>
+                        <p className="text-sm font-medium truncate">{item.name}</p>
+                        <p className="text-xs text-muted-foreground">{formatCurrency(item.price)} each</p>
                       </div>
                       <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => updateQuantity(item.productId, -1)}
-                          className="p-1 rounded hover:bg-secondary transition-colors"
-                        >
+                        <button onClick={() => updateQuantity(item.productId, -1)} className="p-1 rounded hover:bg-secondary transition-colors">
                           <Minus className="h-3 w-3" />
                         </button>
-                        <span className="w-6 text-center text-xs font-medium">
-                          {item.quantity}
-                        </span>
-                        <button
-                          onClick={() => updateQuantity(item.productId, 1)}
-                          className="p-1 rounded hover:bg-secondary transition-colors"
-                        >
+                        <span className="w-6 text-center text-xs font-medium">{item.quantity}</span>
+                        <button onClick={() => updateQuantity(item.productId, 1)} className="p-1 rounded hover:bg-secondary transition-colors">
                           <Plus className="h-3 w-3" />
                         </button>
                       </div>
-                      <p className="text-sm font-semibold w-16 text-right">
-                        {formatCurrency(item.price * item.quantity)}
-                      </p>
-                      <button
-                        onClick={() => removeItem(item.productId)}
-                        className="p-1 rounded hover:bg-secondary transition-colors text-destructive"
-                      >
+                      <p className="text-sm font-semibold w-16 text-right">{formatCurrency(item.price * item.quantity)}</p>
+                      <button onClick={() => removeItem(item.productId)} className="p-1 rounded hover:bg-secondary transition-colors text-destructive">
                         <Trash2 className="h-3 w-3" />
                       </button>
                     </div>
@@ -424,15 +542,12 @@ export default function POSPage() {
               <div className="border-t pt-3">
                 <div className="flex justify-between text-lg font-bold">
                   <span>Total</span>
-                  <span className="text-trekim-500">
-                    {formatCurrency(total)}
-                  </span>
+                  <span className="text-trekim-500">{formatCurrency(total)}</span>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Customer Details */}
           <Card>
             <CardContent className="p-4 space-y-3">
               <h3 className="text-sm font-semibold">Customer Details</h3>
@@ -459,7 +574,6 @@ export default function POSPage() {
             </CardContent>
           </Card>
 
-          {/* Payment Method */}
           <Card>
             <CardContent className="p-4 space-y-3">
               <h3 className="text-sm font-semibold">Payment Method</h3>
@@ -524,7 +638,7 @@ export default function POSPage() {
                 size="lg"
                 onClick={handleSubmit}
                 loading={submitting}
-                disabled={items.length === 0 || !paymentMethod}
+                disabled={items.length === 0 || !paymentMethod || stkState === "waiting"}
               >
                 {paymentMethod === "CASH" ? (
                   <>
@@ -545,7 +659,82 @@ export default function POSPage() {
         </div>
       </div>
 
-      {/* Result Modal */}
+      {/* STK Waiting Overlay */}
+      {stkState === "waiting" && <StkWaitingOverlay onCancel={handleCancelWaiting} />}
+
+      {/* STK Success Overlay */}
+      {stkState === "success" && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <ConfettiOverlay />
+          <div className="bg-background rounded-2xl p-10 max-w-sm w-full mx-4 text-center space-y-6 animate-fade-in shadow-2xl border relative z-10">
+            <div className="mx-auto w-20 h-20 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center animate-bounce">
+              <CheckCircle className="h-12 w-12 text-green-600 dark:text-green-400" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-2xl font-bold text-green-600 dark:text-green-400">Payment Successful!</h3>
+              <p className="text-sm text-muted-foreground">
+                M-Pesa payment confirmed for this order.
+              </p>
+            </div>
+            <div className="rounded-lg bg-secondary/50 p-4 space-y-1">
+              <p className="text-2xl font-bold text-trekim-500">{formatCurrency(total)}</p>
+              <p className="text-xs text-muted-foreground">Total Amount</p>
+            </div>
+            <div className="flex gap-3 pt-2">
+              <Button
+                className="flex-1"
+                onClick={() => {
+                  setStkState("idle");
+                  setItems([]);
+                  setCustomerName("");
+                  setCustomerPhone("");
+                  setStkPhone("");
+                  setPaymentMethod(null);
+                  setStkOrderId(null);
+                }}
+              >
+                New Order
+              </Button>
+              <Button variant="outline" className="flex-1" onClick={() => router.push("/dashboard")}>
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Dashboard
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* STK Failed Overlay */}
+      {stkState === "failed" && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-background rounded-2xl p-10 max-w-sm w-full mx-4 text-center space-y-6 animate-fade-in shadow-2xl border">
+            <div className="mx-auto w-20 h-20 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+              <XCircle className="h-12 w-12 text-red-600 dark:text-red-400" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-2xl font-bold text-red-600 dark:text-red-400">Payment Failed</h3>
+              <p className="text-sm text-muted-foreground">{stkError || "Something went wrong."}</p>
+            </div>
+            <div className="rounded-lg bg-secondary/50 p-4 space-y-1">
+              <p className="text-lg font-semibold">{formatCurrency(total)}</p>
+              <p className="text-xs text-muted-foreground">Amount</p>
+              <p className="text-sm font-medium">{stkPhone}</p>
+              <p className="text-xs text-muted-foreground">Phone Number</p>
+            </div>
+            <div className="flex gap-3 pt-2">
+              <Button className="flex-1" onClick={handleRetry}>
+                <RotateCcw className="mr-2 h-4 w-4" />
+                Try Again
+              </Button>
+              <Button variant="ghost" className="flex-1" onClick={() => setStkState("idle")}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cash Result Modal */}
       <Modal
         open={resultModal}
         onClose={() => setResultModal(false)}
@@ -562,36 +751,22 @@ export default function POSPage() {
                 <p className="text-sm text-muted-foreground">Order Number</p>
               </div>
               <div>
-                <p className="text-2xl font-bold text-trekim-500">
-                  {formatCurrency(resultData.total)}
-                </p>
+                <p className="text-2xl font-bold text-trekim-500">{formatCurrency(resultData.total)}</p>
                 <p className="text-sm text-muted-foreground">Total</p>
               </div>
               {resultData.change > 0 && (
                 <div className="rounded-lg bg-green-100 dark:bg-green-900/30 p-4">
                   <p className="text-sm text-muted-foreground">Change Due</p>
-                  <p className="text-3xl font-bold text-green-600 dark:text-green-400">
-                    {formatCurrency(resultData.change)}
-                  </p>
+                  <p className="text-3xl font-bold text-green-600 dark:text-green-400">{formatCurrency(resultData.change)}</p>
                 </div>
               )}
             </>
           )}
           <div className="flex gap-3 pt-2">
-            <Button
-              className="flex-1"
-              onClick={() => {
-                setResultModal(false);
-                setResultData(null);
-              }}
-            >
+            <Button className="flex-1" onClick={() => { setResultModal(false); setResultData(null); }}>
               New Order
             </Button>
-            <Button
-              variant="outline"
-              className="flex-1"
-              onClick={() => router.push("/dashboard")}
-            >
+            <Button variant="outline" className="flex-1" onClick={() => router.push("/dashboard")}>
               <ArrowLeft className="mr-2 h-4 w-4" />
               Dashboard
             </Button>

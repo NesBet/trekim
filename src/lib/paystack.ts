@@ -74,7 +74,8 @@ export async function initializeTransaction(params: {
       amount: amountInKobo,
       reference: params.reference,
       metadata: params.metadata,
-      callback_url: `${baseUrl}/payment/callback`,
+      channels: ["mobile_money", "card", "bank", "ussd", "qr"],
+      callback_url: `${baseUrl}/inventory`,
     }),
   });
 }
@@ -92,22 +93,19 @@ export async function initiateSTKPush(params: {
   metadata?: Record<string, unknown>;
 }) {
   const amountInKobo = Math.round(params.amount * 100);
-  const phone = params.phone.replace(/^0+/, "+254").replace(/^254/, "+254");
+  const phone = params.phone.replace(/^0+/, "254").replace(/^\+254/, "254");
 
-  return paystackFetch<STKPushData>("/charge", {
+  return paystackFetch("/charge", {
     method: "POST",
     body: JSON.stringify({
       email: "payment@trekim.co.ke",
       amount: amountInKobo,
       reference: params.reference,
       metadata: params.metadata,
-      card: {
-        number: phone,
-        cvv: "STK",
-        expiry_month: "12",
-        expiry_year: "30",
+      mobile_money: {
+        phone,
+        provider: "mpesa",
       },
-      pin: "STK_PUSH",
     }),
   });
 }

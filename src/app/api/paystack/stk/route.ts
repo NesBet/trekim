@@ -77,17 +77,14 @@ export async function POST(request: Request) {
       update: {
         reference,
         method: "MPESA",
-        status: result.data.status === "success" ? "SUCCESS" : "PENDING",
-        mpesaReceipt: result.data.reference || null,
-        paidAt: result.data.paid_at ? new Date(result.data.paid_at) : null,
+        status: "PENDING",
       },
       create: {
         orderId: order.id,
         amount: order.total,
         reference,
         method: "MPESA",
-        status: result.data.status === "success" ? "SUCCESS" : "PENDING",
-        mpesaReceipt: result.data.reference || null,
+        status: "PENDING",
       },
     });
 
@@ -95,14 +92,15 @@ export async function POST(request: Request) {
       data: {
         userId: session.userId,
         action: "STK_PUSH",
-        details: `STK push sent for order ${order.orderNumber}. Phone: ${phone}`,
+        details: `STK push initiated for order ${order.orderNumber}. Phone: ${phone}, Reference: ${reference}`,
       },
     });
 
     return NextResponse.json({
-      success: result.status,
+      success: true,
       reference,
-      message: result.message,
+      orderId: order.id,
+      message: "STK push sent to customer's phone",
     });
   } catch (error) {
     console.error("STK push error:", error);
