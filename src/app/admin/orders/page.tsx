@@ -119,81 +119,97 @@ function StatusDropdown({
   );
 }
 
-function ColumnFilter<T extends string>({
+function FilterableHeader({
   label,
+  active,
+  open,
+  onToggle,
+  children,
+}: {
+  label: string;
+  active: boolean;
+  open: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <TableHead className="relative cursor-pointer select-none" onClick={onToggle}>
+      <div className="flex items-center gap-1.5">
+        <span className="text-xs font-medium">{label}</span>
+        <ChevronDown
+          className={`h-3 w-3 transition-transform duration-200 ${
+            open ? "rotate-180" : ""
+          } ${active ? "text-trekim-500" : "text-muted-foreground"}`}
+        />
+      </div>
+      {children}
+    </TableHead>
+  );
+}
+
+function FilterDropdown<T extends string>({
   options,
   value,
   onChange,
+  open,
+  onClose,
+  label,
 }: {
-  label: string;
   options: { value: T; label: string }[];
   value: T | null;
   onChange: (v: T | null) => void;
+  open: boolean;
+  onClose: () => void;
+  label: string;
 }) {
-  const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
+        onClose();
       }
     };
-    document.addEventListener("mousedown", handler);
+    if (open) {
+      document.addEventListener("mousedown", handler);
+    }
     return () => document.removeEventListener("mousedown", handler);
-  }, []);
+  }, [open, onClose]);
 
-  const selected = options.find((o) => o.value === value);
+  if (!open) return null;
 
   return (
-    <div className="relative inline-flex" ref={ref}>
+    <div
+      ref={ref}
+      className="absolute z-50 top-full mt-1 left-0 min-w-[160px] rounded-lg border bg-background shadow-lg animate-fade-in overflow-hidden"
+    >
       <button
-        onClick={() => setOpen(!open)}
-        className={`inline-flex items-center gap-1 text-xs font-medium transition-colors rounded px-1.5 py-0.5 ${
-          value
-            ? "text-trekim-500 bg-trekim-500/10"
-            : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+        onClick={() => {
+          onChange(null);
+          onClose();
+        }}
+        className={`flex items-center gap-2 w-full px-3 py-2 text-xs hover:bg-secondary transition-colors ${
+          !value ? "font-medium text-trekim-500 bg-trekim-500/5" : ""
         }`}
       >
-        <Filter className="h-3 w-3" />
-        <span className="hidden sm:inline">{selected ? selected.label : label}</span>
-        <ChevronDown
-          className={`h-3 w-3 transition-transform duration-200 ${
-            open ? "rotate-180" : ""
-          }`}
-        />
+        <span className="flex-1 text-left">All {label}</span>
+        {!value && <Check className="h-3 w-3 text-trekim-500" />}
       </button>
-      {open && (
-        <div className="absolute z-50 top-full mt-1 left-0 min-w-[160px] rounded-lg border bg-background shadow-lg animate-fade-in overflow-hidden">
-          <button
-            onClick={() => {
-              onChange(null);
-              setOpen(false);
-            }}
-            className={`flex items-center gap-2 w-full px-3 py-2 text-xs hover:bg-secondary transition-colors ${
-              !value ? "font-medium text-trekim-500 bg-trekim-500/5" : ""
-            }`}
-          >
-            <span className="flex-1 text-left">All {label}</span>
-            {!value && <Check className="h-3 w-3 text-trekim-500" />}
-          </button>
-          {options.map((opt) => (
-            <button
-              key={opt.value}
-              onClick={() => {
-                onChange(opt.value === value ? null : opt.value);
-                setOpen(false);
-              }}
-              className={`flex items-center gap-2 w-full px-3 py-2 text-xs hover:bg-secondary transition-colors ${
-                value === opt.value ? "font-medium text-trekim-500 bg-trekim-500/5" : ""
-              }`}
-            >
-              <span className="flex-1 text-left truncate">{opt.label}</span>
-              {value === opt.value && <Check className="h-3 w-3 text-trekim-500 shrink-0" />}
-            </button>
-          ))}
-        </div>
-      )}
+      {options.map((opt) => (
+        <button
+          key={opt.value}
+          onClick={() => {
+            onChange(opt.value === value ? null : opt.value);
+            onClose();
+          }}
+          className={`flex items-center gap-2 w-full px-3 py-2 text-xs hover:bg-secondary transition-colors ${
+            value === opt.value ? "font-medium text-trekim-500 bg-trekim-500/5" : ""
+          }`}
+        >
+          <span className="flex-1 text-left truncate">{opt.label}</span>
+          {value === opt.value && <Check className="h-3 w-3 text-trekim-500 shrink-0" />}
+        </button>
+      ))}
     </div>
   );
 }
@@ -431,42 +447,54 @@ export default function AdminOrdersPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Order #</TableHead>
-                <TableHead>
-                  <div className="flex items-center gap-1">
-                    <span>Customer</span>
-                    <ColumnFilter
-                      label="Customer"
-                      options={customerOptions}
-                      value={customerFilter}
-                      onChange={setCustomerFilter}
-                    />
-                  </div>
-                </TableHead>
-                <TableHead>
-                  <div className="flex items-center gap-1">
-                    <span>Salesperson</span>
-                    <ColumnFilter
-                      label="Salesperson"
-                      options={salespersonOptions}
-                      value={salespersonFilter}
-                      onChange={setSalespersonFilter}
-                    />
-                  </div>
-                </TableHead>
+                <FilterableHeader
+                  label="Customer"
+                  active={!!customerFilter}
+                  open={customerOpen}
+                  onToggle={() => setCustomerOpen(!customerOpen)}
+                >
+                  <FilterDropdown
+                    label="Customer"
+                    options={customerOptions}
+                    value={customerFilter}
+                    onChange={setCustomerFilter}
+                    open={customerOpen}
+                    onClose={() => setCustomerOpen(false)}
+                  />
+                </FilterableHeader>
+                <FilterableHeader
+                  label="Salesperson"
+                  active={!!salespersonFilter}
+                  open={salespersonOpen}
+                  onToggle={() => setSalespersonOpen(!salespersonOpen)}
+                >
+                  <FilterDropdown
+                    label="Salesperson"
+                    options={salespersonOptions}
+                    value={salespersonFilter}
+                    onChange={setSalespersonFilter}
+                    open={salespersonOpen}
+                    onClose={() => setSalespersonOpen(false)}
+                  />
+                </FilterableHeader>
                 <TableHead>Items</TableHead>
                 <TableHead>Total</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>
-                  <div className="flex items-center gap-1">
-                    <span>Payment</span>
-                    <ColumnFilter
-                      label="Payment"
-                      options={paymentMethodOptions}
-                      value={paymentMethodFilter}
-                      onChange={setPaymentMethodFilter}
-                    />
-                  </div>
-                </TableHead>
+                <FilterableHeader
+                  label="Payment"
+                  active={!!paymentMethodFilter}
+                  open={paymentOpen}
+                  onToggle={() => setPaymentOpen(!paymentOpen)}
+                >
+                  <FilterDropdown
+                    label="Payment"
+                    options={paymentMethodOptions}
+                    value={paymentMethodFilter}
+                    onChange={setPaymentMethodFilter}
+                    open={paymentOpen}
+                    onClose={() => setPaymentOpen(false)}
+                  />
+                </FilterableHeader>
                 <TableHead>Date</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
