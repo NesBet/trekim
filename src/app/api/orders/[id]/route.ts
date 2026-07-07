@@ -75,21 +75,34 @@ export async function PATCH(
 
     const order = await prisma.order.findUnique({
       where: { id },
+      include: { payment: true },
     });
 
     if (!order) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
 
-    if (session.role === "CUSTOMER" && status !== "CANCELLED") {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    if (session.role === "CUSTOMER") {
+      if (status !== "CANCELLED") {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+      if (order.customerId !== session.userId) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+    } else if (session.role === "SALESPERSON") {
+      return NextResponse.json(
+        { error: "Only admins can update order status" },
+        { status: 403 }
+      );
     }
 
-    if (
-      session.role === "CUSTOMER" &&
-      order.customerId !== session.userId
-    ) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    if (status === "COMPLETED") {
+      if (!order.payment || order.payment.status !== "SUCCESS") {
+        return NextResponse.json(
+          { error: "Order must be paid before it can be completed" },
+          { status: 400 }
+        );
+      }
     }
 
     const updated = await prisma.order.update({

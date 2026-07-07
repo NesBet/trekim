@@ -189,7 +189,14 @@ export default function AdminOrdersPage() {
                       {order.customer?.email}
                     </span>
                   </TableCell>
-                  <TableCell>{order.salesperson?.name || "-"}</TableCell>
+                  <TableCell>
+                    {order.salesperson?.name || "Online"}
+                    {order.salesperson && (
+                      <span className="text-xs text-muted-foreground block">
+                        {order.salesperson.email}
+                      </span>
+                    )}
+                  </TableCell>
                   <TableCell>
                     {order.items.map((i) => i.product.name).join(", ")}
                   </TableCell>

@@ -1,9 +1,7 @@
 import { jwtVerify, type JWTPayload } from "jose";
 import type { Role } from "@prisma/client";
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || "fallback-secret-do-not-use-in-production"
-);
+const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
 
 export interface TokenPayload extends JWTPayload {
   userId: string;

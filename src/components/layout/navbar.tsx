@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { ThemeToggle } from "./theme-toggle";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import {
   ShoppingCart,
   Menu,
@@ -16,11 +16,21 @@ import {
   User,
   GlassWater,
 } from "lucide-react";
+import toast from "react-hot-toast";
 
 export function Navbar() {
-  const { user, loading, logout } = useAuth();
+  const { user, loading, logout, logoutLoading } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
+
+  const handleLogout = useCallback(async () => {
+    try {
+      await logout();
+      toast.success("Logged out successfully");
+    } catch {
+      toast.error("Failed to logout. Please try again.");
+    }
+  }, [logout]);
 
   const isAuthPage = pathname === "/login" || pathname === "/signup";
 
@@ -107,7 +117,7 @@ export function Navbar() {
                 <User className="h-4 w-4" />
                 <span className="hidden lg:inline">{user.name}</span>
               </Link>
-              <Button variant="ghost" size="sm" onClick={logout}>
+              <Button variant="ghost" size="sm" onClick={handleLogout} loading={logoutLoading}>
                 <LogOut className="h-4 w-4 mr-1" />
                 Logout
               </Button>
@@ -153,7 +163,7 @@ export function Navbar() {
             <div className="border-t pt-3 flex items-center gap-3">
               <ThemeToggle />
               {user ? (
-                <Button variant="ghost" size="sm" onClick={logout}>
+                <Button variant="ghost" size="sm" onClick={handleLogout} loading={logoutLoading}>
                   <LogOut className="h-4 w-4 mr-1" />
                   Logout
                 </Button>

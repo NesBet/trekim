@@ -8,10 +8,11 @@ import { Footer } from "@/components/layout/footer";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Trekim Bar & Lounge - Premium Drinks in Kiserian",
+  title: "Trekim Tavern - Premium Drinks in Kiserian",
   description:
-    "Trekim Bar & Lounge offers premium alcoholic drinks in Kiserian, along Magadi Road, Nairobi. Browse our selection of beers, wines, spirits, and more.",
-  keywords: "Trekim, bar, lounge, Kiserian, Magadi Road, Nairobi, drinks, alcoholic beverages, Kenya",
+    "Trekim Tavern offers premium alcoholic drinks in Kiserian, along Magadi Road, Nairobi. Browse our selection of beers, wines, spirits, and more.",
+  keywords:
+    "Trekim, bar, lounge, Kiserian, Magadi Road, Nairobi, drinks, alcohol, Kenya",
 };
 
 export default function RootLayout({

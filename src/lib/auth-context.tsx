@@ -21,6 +21,7 @@ interface User {
 interface AuthContextType {
   user: User | null;
   loading: boolean;
+  logoutLoading: boolean;
   login: (email: string, password: string) => Promise<User>;
   signup: (data: {
     name: string;
@@ -37,6 +38,7 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [logoutLoading, setLogoutLoading] = useState(false);
   const router = useRouter();
 
   const fetchUser = useCallback(async () => {
@@ -106,15 +108,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
-    setUser(null);
-    setLoading(false);
-    router.push("/login");
+    setLogoutLoading(true);
+    try {
+      const res = await fetch("/api/auth/logout", { method: "POST" });
+      if (!res.ok) throw new Error("Logout failed");
+      setUser(null);
+      setLogoutLoading(false);
+      router.push("/login");
+    } catch (err) {
+      setLogoutLoading(false);
+      throw err;
+    }
   };
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, login, signup, logout, refetch: fetchUser }}
+      value={{ user, loading, logoutLoading, login, signup, logout, refetch: fetchUser }}
     >
       {children}
     </AuthContext.Provider>

@@ -24,7 +24,7 @@ export function Footer() {
               </div>
               <div className="flex items-center gap-2">
                 <Phone className="h-4 w-4" />
-                <span>+254 700 000 000</span>
+                <span>+254 795 280 737</span>
               </div>
             </div>
           </div>
@@ -40,7 +40,10 @@ export function Footer() {
         </div>
 
         <div className="border-t mt-8 pt-6 text-center text-sm text-muted-foreground">
-          <p>&copy; {new Date().getFullYear()} Trekim Bar & Lounge. All rights reserved.</p>
+          <p>
+            &copy; {new Date().getFullYear()} Trekim Tavern. All rights
+            reserved.
+          </p>
         </div>
       </div>
     </footer>

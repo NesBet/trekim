@@ -4,9 +4,7 @@ import { cookies } from "next/headers";
 import { prisma } from "./prisma";
 import type { Role } from "@prisma/client";
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || "fallback-secret-do-not-use-in-production"
-);
+const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
 
 const TOKEN_NAME = "trekim_token";
 const SALT_ROUNDS = 12;
@@ -23,7 +21,7 @@ export async function hashPassword(password: string): Promise<string> {
 
 export async function verifyPassword(
   password: string,
-  hash: string
+  hash: string,
 ): Promise<boolean> {
   return bcrypt.compare(password, hash);
 }
@@ -55,7 +53,9 @@ export async function getSession(): Promise<TokenPayload | null> {
 export async function setSession(payload: Omit<TokenPayload, "iat" | "exp">) {
   const token = await createToken(payload);
   const cookieStore = await cookies();
-  const isSecure = process.env.NODE_ENV === "production" && process.env.DISABLE_SECURE_COOKIE !== "true";
+  const isSecure =
+    process.env.NODE_ENV === "production" &&
+    process.env.DISABLE_SECURE_COOKIE !== "true";
   cookieStore.set(TOKEN_NAME, token, {
     httpOnly: true,
     secure: isSecure,
@@ -68,7 +68,9 @@ export async function setSession(payload: Omit<TokenPayload, "iat" | "exp">) {
 
 export async function clearSession() {
   const cookieStore = await cookies();
-  const isSecure = process.env.NODE_ENV === "production" && process.env.DISABLE_SECURE_COOKIE !== "true";
+  const isSecure =
+    process.env.NODE_ENV === "production" &&
+    process.env.DISABLE_SECURE_COOKIE !== "true";
   cookieStore.set(TOKEN_NAME, "", {
     httpOnly: true,
     secure: isSecure,

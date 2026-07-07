@@ -38,6 +38,7 @@ export async function GET(request: Request) {
         },
         payment: true,
         customer: { select: { name: true, email: true, phone: true } },
+        salesperson: { select: { name: true, email: true } },
       },
       orderBy: { createdAt: "desc" },
     });

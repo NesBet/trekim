@@ -94,21 +94,6 @@ export default function DashboardPage() {
     }
   };
 
-  const updateStatus = async (orderId: string, status: string) => {
-    try {
-      const res = await fetch(`/api/orders/${orderId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
-      });
-      if (!res.ok) throw new Error("Failed to update");
-      toast.success(`Order ${status.toLowerCase()}`);
-      fetchOrders();
-    } catch {
-      toast.error("Failed to update order");
-    }
-  };
-
   const statusColors: Record<string, string> = {
     PENDING: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
     CONFIRMED: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
@@ -195,7 +180,6 @@ export default function DashboardPage() {
                     <TableHead>Status</TableHead>
                     <TableHead>Payment</TableHead>
                     <TableHead>Date</TableHead>
-                    <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -235,69 +219,6 @@ export default function DashboardPage() {
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {formatDate(order.createdAt)}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-2">
-                          {order.status === "PENDING" && (
-                            <>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() =>
-                                  updateStatus(order.id, "CONFIRMED")
-                                }
-                              >
-                                Confirm
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() =>
-                                  updateStatus(order.id, "CANCELLED")
-                                }
-                              >
-                                Cancel
-                              </Button>
-                            </>
-                          )}
-                          {order.status === "CONFIRMED" && (
-                            <>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() =>
-                                  updateStatus(order.id, "PROCESSING")
-                                }
-                              >
-                                Process
-                              </Button>
-                              {!order.payment ||
-                                (order.payment.status !== "SUCCESS" && (
-                                  <Button
-                                    size="sm"
-                                    onClick={() => {
-                                      setSelectedOrder(order);
-                                      setPhone(order.customer?.phone || "");
-                                      setStkModal(true);
-                                    }}
-                                  >
-                                    <Smartphone className="h-4 w-4 mr-1" />
-                    STK Push
-                                  </Button>
-                                ))}
-                            </>
-                          )}
-                          {order.status === "PROCESSING" && (
-                            <Button
-                              size="sm"
-                              onClick={() =>
-                                updateStatus(order.id, "COMPLETED")
-                              }
-                            >
-                              Complete
-                            </Button>
-                          )}
-                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

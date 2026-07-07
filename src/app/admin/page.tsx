@@ -39,10 +39,7 @@ export default function AdminPage() {
 
       const revenue = orders.orders
         .filter((o: { status: string }) => o.status === "COMPLETED")
-        .reduce(
-          (sum: number, o: { total: number }) => sum + o.total,
-          0
-        );
+        .reduce((sum: number, o: { total: number }) => sum + o.total, 0);
 
       setStats({
         products: products.products?.length || 0,
@@ -92,9 +89,7 @@ export default function AdminPage() {
     <div>
       <div className="mb-8">
         <h1 className="text-3xl font-bold">Admin Overview</h1>
-        <p className="text-muted-foreground">
-          Manage Trekim Bar & Lounge
-        </p>
+        <p className="text-muted-foreground">Manage Trekim Tavern</p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
