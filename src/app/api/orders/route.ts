@@ -13,6 +13,8 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
     const paymentStatus = searchParams.get("paymentStatus");
+    const dateFrom = searchParams.get("dateFrom");
+    const dateTo = searchParams.get("dateTo");
 
     let where: Record<string, unknown> = {};
 
@@ -28,6 +30,17 @@ export async function GET(request: Request) {
 
     if (paymentStatus) {
       where.payment = { status: paymentStatus };
+    }
+
+    if (dateFrom || dateTo) {
+      const createdAt: Record<string, Date> = {};
+      if (dateFrom) createdAt.gte = new Date(dateFrom);
+      if (dateTo) {
+        const endDate = new Date(dateTo);
+        endDate.setHours(23, 59, 59, 999);
+        createdAt.lte = endDate;
+      }
+      where.createdAt = createdAt;
     }
 
     const orders = await prisma.order.findMany({

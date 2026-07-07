@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -12,7 +12,16 @@ import {
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { ShoppingCart, Package, Clock, CheckCircle, XCircle } from "lucide-react";
+import {
+  ShoppingCart,
+  Package,
+  Clock,
+  CheckCircle,
+  XCircle,
+  ChevronDown,
+  Check,
+  Calendar,
+} from "lucide-react";
 import toast from "react-hot-toast";
 
 interface Order {
@@ -31,19 +40,98 @@ interface Order {
   payment: { status: string; reference: string; method: string } | null;
 }
 
+const ALL_STATUSES = ["PENDING", "CONFIRMED", "PROCESSING", "COMPLETED", "CANCELLED"];
+
+function StatusDropdown({
+  value,
+  onChange,
+}: {
+  value: string | null;
+  onChange: (v: string | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const selectedLabel = value
+    ? value.charAt(0) + value.slice(1).toLowerCase()
+    : "All Statuses";
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-2 h-10 px-3 rounded-lg border border-input bg-background text-sm font-medium hover:bg-secondary transition-colors min-w-[160px]"
+      >
+        <span className="flex-1 text-left truncate">{selectedLabel}</span>
+        <ChevronDown
+          className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${
+            open ? "rotate-180" : ""
+          }`}
+        />
+      </button>
+      {open && (
+        <div className="absolute z-50 top-full mt-1 w-full rounded-lg border bg-background shadow-lg animate-fade-in overflow-hidden">
+          <button
+            onClick={() => {
+              onChange(null);
+              setOpen(false);
+            }}
+            className={`flex items-center gap-2 w-full px-3 py-2.5 text-sm hover:bg-secondary transition-colors ${
+              !value ? "font-medium text-trekim-500 bg-trekim-500/5" : ""
+            }`}
+          >
+            <span className="flex-1 text-left">All Statuses</span>
+            {!value && <Check className="h-4 w-4 text-trekim-500" />}
+          </button>
+          {ALL_STATUSES.map((s) => (
+            <button
+              key={s}
+              onClick={() => {
+                onChange(s === value ? null : s);
+                setOpen(false);
+              }}
+              className={`flex items-center gap-2 w-full px-3 py-2.5 text-sm hover:bg-secondary transition-colors ${
+                value === s ? "font-medium text-trekim-500 bg-trekim-500/5" : ""
+              }`}
+            >
+              <span className="flex-1 text-left">
+                {s.charAt(0) + s.slice(1).toLowerCase()}
+              </span>
+              {value === s && <Check className="h-4 w-4 text-trekim-500" />}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string | null>(null);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
 
-  useEffect(() => {
-    fetchOrders();
-  }, []);
-
-  const fetchOrders = async () => {
+  const fetchOrders = useCallback(async () => {
+    setLoading(true);
     try {
-      const url = filter ? `/api/orders?status=${filter}` : "/api/orders";
-      const res = await fetch(url);
+      const params = new URLSearchParams();
+      if (filter) params.set("status", filter);
+      if (dateFrom) params.set("dateFrom", dateFrom);
+      if (dateTo) params.set("dateTo", dateTo);
+      const qs = params.toString();
+      const res = await fetch(`/api/orders${qs ? `?${qs}` : ""}`);
       const data = await res.json();
       setOrders(data.orders);
     } catch {
@@ -51,7 +139,11 @@ export default function AdminOrdersPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filter, dateFrom, dateTo]);
+
+  useEffect(() => {
+    fetchOrders();
+  }, [fetchOrders]);
 
   const updateStatus = async (orderId: string, status: string) => {
     try {
@@ -60,11 +152,14 @@ export default function AdminOrdersPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status }),
       });
-      if (!res.ok) throw new Error("Failed to update");
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to update");
+      }
       toast.success(`Order ${status.toLowerCase()}`);
       fetchOrders();
-    } catch {
-      toast.error("Failed to update order");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update order");
     }
   };
 
@@ -75,15 +170,6 @@ export default function AdminOrdersPage() {
     COMPLETED: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
     CANCELLED: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
   };
-
-  const filters = [
-    { label: "All", value: null },
-    { label: "Pending", value: "PENDING" },
-    { label: "Confirmed", value: "CONFIRMED" },
-    { label: "Processing", value: "PROCESSING" },
-    { label: "Completed", value: "COMPLETED" },
-    { label: "Cancelled", value: "CANCELLED" },
-  ];
 
   const stats = [
     { label: "Total", value: orders.length, icon: ShoppingCart },
@@ -127,23 +213,40 @@ export default function AdminOrdersPage() {
         ))}
       </div>
 
-      <div className="flex gap-2 mb-6 flex-wrap">
-        {filters.map((f) => (
-          <button
-            key={f.label}
-            onClick={() => {
-              setFilter(f.value);
-              setLoading(true);
-            }}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              filter === f.value
-                ? "bg-trekim-500 text-black"
-                : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
+      <div className="flex flex-col sm:flex-row gap-3 mb-6">
+        <StatusDropdown value={filter} onChange={setFilter} />
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="relative">
+            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="h-10 rounded-lg border border-input bg-background pl-10 pr-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            />
+          </div>
+          <span className="text-xs text-muted-foreground">to</span>
+          <div className="relative">
+            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="h-10 rounded-lg border border-input bg-background pl-10 pr-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            />
+          </div>
+          {(dateFrom || dateTo) && (
+            <button
+              onClick={() => {
+                setDateFrom("");
+                setDateTo("");
+              }}
+              className="h-10 px-3 rounded-lg border border-input text-sm text-muted-foreground hover:bg-secondary transition-colors"
+            >
+              Clear Dates
+            </button>
+          )}
+        </div>
       </div>
 
       {loading ? (
@@ -159,6 +262,9 @@ export default function AdminOrdersPage() {
         <div className="text-center py-16">
           <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
           <p className="text-lg font-medium">No orders found</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Try adjusting the filters
+          </p>
         </div>
       ) : (
         <div className="rounded-lg border overflow-x-auto">
@@ -228,7 +334,7 @@ export default function AdminOrdersPage() {
                       </span>
                     )}
                   </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
+                  <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                     {formatDate(order.createdAt)}
                   </TableCell>
                   <TableCell>

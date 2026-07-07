@@ -24,6 +24,14 @@ export async function POST(request: Request) {
       });
 
       if (payment && payment.status !== "SUCCESS") {
+        const orderData = await prisma.order.findUnique({
+          where: { id: payment.orderId },
+          select: { salespersonId: true, orderNumber: true },
+        });
+
+        const isPOS = !!orderData?.salespersonId;
+        const newStatus = isPOS ? "COMPLETED" : "PROCESSING";
+
         await prisma.payment.update({
           where: { reference },
           data: {
@@ -35,13 +43,13 @@ export async function POST(request: Request) {
 
         await prisma.order.update({
           where: { id: payment.orderId },
-          data: { status: "CONFIRMED" },
+          data: { status: newStatus },
         });
 
         await prisma.auditLog.create({
           data: {
             action: "PAYMENT_VERIFIED",
-            details: `Payment ${reference} verified successfully for order ${payment.order.orderNumber}`,
+            details: `Payment ${reference} verified for order ${orderData?.orderNumber}. Status set to ${newStatus} (${isPOS ? "POS" : "Online"}).`,
           },
         });
       }
