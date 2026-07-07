@@ -225,6 +225,9 @@ export default function AdminOrdersPage() {
   const [customerFilter, setCustomerFilter] = useState<string | null>(null);
   const [salespersonFilter, setSalespersonFilter] = useState<string | null>(null);
   const [paymentMethodFilter, setPaymentMethodFilter] = useState<string | null>(null);
+  const [customerOpen, setCustomerOpen] = useState(false);
+  const [salespersonOpen, setSalespersonOpen] = useState(false);
+  const [paymentOpen, setPaymentOpen] = useState(false);
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
