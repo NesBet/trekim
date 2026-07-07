@@ -76,7 +76,7 @@ export function LoginForm() {
               </button>
             }
           />
-          <Button type="submit" className="w-full" loading={loading}>
+          <Button type="submit" className="w-full" loading={loading} disabled={!form.email || !form.password}>
             Sign In
           </Button>
         </form>
