@@ -124,7 +124,7 @@ export function Navbar() {
                 <User className="h-4 w-4" />
                 <span className="hidden lg:inline">{user.name}</span>
               </Link>
-              <Button variant="ghost" size="sm" onClick={handleLogout} loading={logoutLoading}>
+              <Button variant="danger" size="sm" onClick={handleLogout} loading={logoutLoading}>
                 <LogOut className="h-4 w-4 mr-1" />
                 Logout
               </Button>
@@ -175,7 +175,7 @@ export function Navbar() {
             <div className="border-t pt-3 flex items-center gap-3">
               <ThemeToggle />
               {user ? (
-                <Button variant="ghost" size="sm" onClick={handleLogout} loading={logoutLoading}>
+                <Button variant="danger" size="sm" onClick={handleLogout} loading={logoutLoading}>
                   <LogOut className="h-4 w-4 mr-1" />
                   Logout
                 </Button>
