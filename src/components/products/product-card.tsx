@@ -32,7 +32,7 @@ export function ProductCard({
   const outOfStock = product.stock === 0;
 
   return (
-    <Card className="overflow-hidden transition-all hover:shadow-md">
+    <Card className="overflow-hidden transition-all duration-300 border-trekim-500/50 dark:border-transparent hover:-translate-y-1 hover:shadow-lg">
       <div className="relative aspect-[4/3] bg-gradient-to-br from-trekim-100 to-trekim-200 dark:from-trekim-950 dark:to-trekim-900 flex items-center justify-center">
         {product.image ? (
           <img
