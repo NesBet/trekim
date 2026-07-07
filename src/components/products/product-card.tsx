@@ -44,7 +44,7 @@ export function ProductCard({
           <Package className="h-16 w-16 text-trekim-500/50" />
         )}
         {product.category && (
-          <span className="absolute top-2 left-2 rounded-full bg-background/80 backdrop-blur-sm px-2.5 py-0.5 text-xs font-medium">
+          <span className="absolute top-2 left-2 rounded-full bg-background/80 backdrop-blur-sm px-2.5 py-0.5 text-xs font-medium text-trekim-500">
             {product.category}
           </span>
         )}
