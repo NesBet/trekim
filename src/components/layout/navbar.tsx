@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
+import { useCart } from "@/lib/cart-context";
 import { ThemeToggle } from "./theme-toggle";
 import { Button } from "@/components/ui/button";
 import { useState, useCallback } from "react";
@@ -20,6 +21,7 @@ import toast from "react-hot-toast";
 
 export function Navbar() {
   const { user, loading, logout, logoutLoading } = useAuth();
+  const { itemCount } = useCart();
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
 
@@ -99,6 +101,11 @@ export function Navbar() {
               >
                 {link.icon && <link.icon className="h-4 w-4" />}
                 {link.label}
+                {link.href === "/cart" && itemCount > 0 && (
+                  <span className="ml-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-trekim-500 px-1 text-[10px] font-bold text-white">
+                    {itemCount > 9 ? "9+" : itemCount}
+                  </span>
+                )}
               </Link>
             ))}
           </nav>
@@ -158,6 +165,11 @@ export function Navbar() {
               >
                 {link.icon && <link.icon className="h-4 w-4" />}
                 {link.label}
+                {link.href === "/cart" && itemCount > 0 && (
+                  <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-trekim-500 px-1 text-[10px] font-bold text-white">
+                    {itemCount > 9 ? "9+" : itemCount}
+                  </span>
+                )}
               </Link>
             ))}
             <div className="border-t pt-3 flex items-center gap-3">

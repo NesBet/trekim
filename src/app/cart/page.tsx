@@ -48,6 +48,7 @@ function CartContent() {
   const persist = (updated: CartItem[]) => {
     localStorage.setItem("trekim_cart", JSON.stringify(updated));
     setItems(updated);
+    window.dispatchEvent(new Event("cart-updated"));
   };
 
   const updateQuantity = (productId: string, delta: number) => {

@@ -95,6 +95,7 @@ function InventoryContent() {
       });
     }
     localStorage.setItem("trekim_cart", JSON.stringify(cart));
+    window.dispatchEvent(new Event("cart-updated"));
     toast.success(`${quantity}x ${product.name} added to cart`);
   };
 
