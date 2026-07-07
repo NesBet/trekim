@@ -1,4 +1,4 @@
-import { GlassWater, MapPin, Phone } from "lucide-react";
+import { GlassWater, MapPin, Phone, Mail } from "lucide-react";
 
 export function Footer() {
   return (
@@ -25,6 +25,10 @@ export function Footer() {
               <div className="flex items-center gap-2">
                 <Phone className="h-4 w-4" />
                 <span>+254 795 280 737</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Mail className="h-4 w-4" />
+                <span>contact@trekim.com</span>
               </div>
             </div>
           </div>

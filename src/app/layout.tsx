@@ -13,6 +13,7 @@ export const metadata: Metadata = {
     "Trekim Tavern offers premium alcoholic drinks in Kiserian, along Magadi Road, Nairobi. Browse our selection of beers, wines, spirits, and more.",
   keywords:
     "Trekim, bar, lounge, Kiserian, Magadi Road, Nairobi, drinks, alcohol, Kenya",
+  icons: [{ rel: "icon", url: "/favicon.png" }],
 };
 
 export default function RootLayout({

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -21,6 +21,9 @@ import {
   ChevronDown,
   Check,
   Calendar,
+  Search,
+  X,
+  Filter,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -116,12 +119,96 @@ function StatusDropdown({
   );
 }
 
+function ColumnFilter<T extends string>({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  options: { value: T; label: string }[];
+  value: T | null;
+  onChange: (v: T | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const selected = options.find((o) => o.value === value);
+
+  return (
+    <div className="relative inline-flex" ref={ref}>
+      <button
+        onClick={() => setOpen(!open)}
+        className={`inline-flex items-center gap-1 text-xs font-medium transition-colors rounded px-1.5 py-0.5 ${
+          value
+            ? "text-trekim-500 bg-trekim-500/10"
+            : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+        }`}
+      >
+        <Filter className="h-3 w-3" />
+        <span className="hidden sm:inline">{selected ? selected.label : label}</span>
+        <ChevronDown
+          className={`h-3 w-3 transition-transform duration-200 ${
+            open ? "rotate-180" : ""
+          }`}
+        />
+      </button>
+      {open && (
+        <div className="absolute z-50 top-full mt-1 left-0 min-w-[160px] rounded-lg border bg-background shadow-lg animate-fade-in overflow-hidden">
+          <button
+            onClick={() => {
+              onChange(null);
+              setOpen(false);
+            }}
+            className={`flex items-center gap-2 w-full px-3 py-2 text-xs hover:bg-secondary transition-colors ${
+              !value ? "font-medium text-trekim-500 bg-trekim-500/5" : ""
+            }`}
+          >
+            <span className="flex-1 text-left">All {label}</span>
+            {!value && <Check className="h-3 w-3 text-trekim-500" />}
+          </button>
+          {options.map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => {
+                onChange(opt.value === value ? null : opt.value);
+                setOpen(false);
+              }}
+              className={`flex items-center gap-2 w-full px-3 py-2 text-xs hover:bg-secondary transition-colors ${
+                value === opt.value ? "font-medium text-trekim-500 bg-trekim-500/5" : ""
+              }`}
+            >
+              <span className="flex-1 text-left truncate">{opt.label}</span>
+              {value === opt.value && <Check className="h-3 w-3 text-trekim-500 shrink-0" />}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string | null>(null);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+
+  const [search, setSearch] = useState("");
+  const [customerFilter, setCustomerFilter] = useState<string | null>(null);
+  const [salespersonFilter, setSalespersonFilter] = useState<string | null>(null);
+  const [paymentMethodFilter, setPaymentMethodFilter] = useState<string | null>(null);
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
@@ -144,6 +231,58 @@ export default function AdminOrdersPage() {
   useEffect(() => {
     fetchOrders();
   }, [fetchOrders]);
+
+  const customerOptions = useMemo(() => {
+    const names = new Set<string>();
+    orders.forEach((o) => names.add(o.customer?.name || "Walk-in"));
+    return Array.from(names).sort().map((n) => ({ value: n, label: n }));
+  }, [orders]);
+
+  const salespersonOptions = useMemo(() => {
+    const names = new Set<string>();
+    orders.forEach((o) => names.add(o.salesperson?.name || "Online"));
+    return Array.from(names).sort().map((n) => ({ value: n, label: n }));
+  }, [orders]);
+
+  const paymentMethodOptions = useMemo(() => {
+    const methods = new Set<string>();
+    orders.forEach((o) => {
+      const m = o.payment?.method || "Unpaid";
+      methods.add(m);
+    });
+    return Array.from(methods).sort().map((m) => ({ value: m, label: m }));
+  }, [orders]);
+
+  const filteredOrders = useMemo(() => {
+    return orders.filter((o) => {
+      if (search) {
+        const q = search.toLowerCase();
+        const matchOrderNum = o.orderNumber.toLowerCase().includes(q);
+        const matchCustomer = (o.customer?.name || "").toLowerCase().includes(q);
+        const matchItems = o.items.some((i) =>
+          i.product.name.toLowerCase().includes(q)
+        );
+        if (!matchOrderNum && !matchCustomer && !matchItems) return false;
+      }
+
+      if (customerFilter) {
+        const name = o.customer?.name || "Walk-in";
+        if (name !== customerFilter) return false;
+      }
+
+      if (salespersonFilter) {
+        const name = o.salesperson?.name || "Online";
+        if (name !== salespersonFilter) return false;
+      }
+
+      if (paymentMethodFilter) {
+        const method = o.payment?.method || "Unpaid";
+        if (method !== paymentMethodFilter) return false;
+      }
+
+      return true;
+    });
+  }, [orders, search, customerFilter, salespersonFilter, paymentMethodFilter]);
 
   const updateStatus = async (orderId: string, status: string) => {
     try {
@@ -171,21 +310,23 @@ export default function AdminOrdersPage() {
     CANCELLED: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
   };
 
+  const hasActiveFilter = customerFilter || salespersonFilter || paymentMethodFilter;
+
   const stats = [
-    { label: "Total", value: orders.length, icon: ShoppingCart },
+    { label: "Total", value: filteredOrders.length, icon: ShoppingCart },
     {
       label: "Pending",
-      value: orders.filter((o) => o.status === "PENDING").length,
+      value: filteredOrders.filter((o) => o.status === "PENDING").length,
       icon: Clock,
     },
     {
       label: "Completed",
-      value: orders.filter((o) => o.status === "COMPLETED").length,
+      value: filteredOrders.filter((o) => o.status === "COMPLETED").length,
       icon: CheckCircle,
     },
     {
       label: "Cancelled",
-      value: orders.filter((o) => o.status === "CANCELLED").length,
+      value: filteredOrders.filter((o) => o.status === "CANCELLED").length,
       icon: XCircle,
     },
   ];
@@ -215,6 +356,24 @@ export default function AdminOrdersPage() {
 
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <StatusDropdown value={filter} onChange={setFilter} />
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder="Search orders..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full h-10 rounded-lg border border-input bg-background pl-10 pr-4 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          />
+          {search && (
+            <button
+              onClick={() => setSearch("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
         <div className="flex items-center gap-2 flex-wrap">
           <div className="relative">
             <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -258,7 +417,7 @@ export default function AdminOrdersPage() {
             />
           ))}
         </div>
-      ) : orders.length === 0 ? (
+      ) : filteredOrders.length === 0 ? (
         <div className="text-center py-16">
           <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
           <p className="text-lg font-medium">No orders found</p>
@@ -272,18 +431,48 @@ export default function AdminOrdersPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Order #</TableHead>
-                <TableHead>Customer</TableHead>
-                <TableHead>Salesperson</TableHead>
+                <TableHead>
+                  <div className="flex items-center gap-1">
+                    <span>Customer</span>
+                    <ColumnFilter
+                      label="Customer"
+                      options={customerOptions}
+                      value={customerFilter}
+                      onChange={setCustomerFilter}
+                    />
+                  </div>
+                </TableHead>
+                <TableHead>
+                  <div className="flex items-center gap-1">
+                    <span>Salesperson</span>
+                    <ColumnFilter
+                      label="Salesperson"
+                      options={salespersonOptions}
+                      value={salespersonFilter}
+                      onChange={setSalespersonFilter}
+                    />
+                  </div>
+                </TableHead>
                 <TableHead>Items</TableHead>
                 <TableHead>Total</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Payment</TableHead>
+                <TableHead>
+                  <div className="flex items-center gap-1">
+                    <span>Payment</span>
+                    <ColumnFilter
+                      label="Payment"
+                      options={paymentMethodOptions}
+                      value={paymentMethodFilter}
+                      onChange={setPaymentMethodFilter}
+                    />
+                  </div>
+                </TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {orders.map((order) => (
+              {filteredOrders.map((order) => (
                 <TableRow key={order.id}>
                   <TableCell className="font-medium">
                     {order.orderNumber}

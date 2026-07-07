@@ -3,7 +3,15 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { GlassWater, MapPin, Clock, Star, ArrowRight, Beer, Zap } from "lucide-react";
+import {
+  GlassWater,
+  MapPin,
+  Clock,
+  Star,
+  ArrowRight,
+  Beer,
+  Zap,
+} from "lucide-react";
 
 const features = [
   {
@@ -43,12 +51,11 @@ export default function HomePage() {
               <GlassWater className="h-16 w-16 text-trekim-500" />
             </div>
             <h1 className="text-4xl md:text-6xl font-bold tracking-tight mb-6">
-              Welcome to{" "}
-              <span className="text-trekim-500">Trekim</span> Bar & Lounge
+              Welcome to <span className="text-trekim-500">Trekim</span> Tavern
             </h1>
             <p className="text-lg md:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-              Kiserian&apos;s premier destination for premium drinks, great music,
-              and unforgettable nights. Located along Magadi Road.
+              Kiserian&apos;s premier destination for premium drinks, great
+              music, and unforgettable nights. Located along Magadi Road.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link href="/inventory">
@@ -99,7 +106,10 @@ export default function HomePage() {
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {categories.map((cat) => (
-              <Link key={cat.name} href={`/inventory?category=${cat.name.toLowerCase()}`}>
+              <Link
+                key={cat.name}
+                href={`/inventory?category=${cat.name.toLowerCase()}`}
+              >
                 <div
                   className={`rounded-xl bg-gradient-to-br ${cat.color} p-6 text-center text-white hover:scale-105 transition-transform cursor-pointer`}
                 >
