@@ -3,11 +3,14 @@
 import Link from "next/link";
 import { ShoppingCart } from "lucide-react";
 import { useCart } from "@/lib/cart-context";
+import { useAuth } from "@/lib/auth-context";
 
 export function FloatingCartButton() {
   const { itemCount } = useCart();
+  const { user } = useAuth();
 
   if (itemCount === 0) return null;
+  if (!user || user.role !== "CUSTOMER") return null;
 
   return (
     <Link
