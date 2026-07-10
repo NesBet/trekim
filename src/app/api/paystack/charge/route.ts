@@ -85,7 +85,7 @@ export async function POST(request: Request) {
       where: { id: session.userId },
     });
 
-    await chargeMobileMoney({
+    const chargeResult = await chargeMobileMoney({
       email: user?.email || (session.role === "CUSTOMER" ? `${session.userId}@trekim.co.ke` : "pos@trekim.co.ke"),
       amount: order.total,
       phone: formattedPhone,
@@ -99,6 +99,82 @@ export async function POST(request: Request) {
       },
     });
 
+    const chargeStatus = chargeResult.data.status;
+
+    if (chargeStatus === "success") {
+      const isPOS = !!order.salespersonId;
+      const newStatus = isPOS ? "COMPLETED" : "PROCESSING";
+
+      await prisma.payment.upsert({
+        where: { orderId: order.id },
+        update: {
+          reference,
+          method: "MPESA",
+          status: "SUCCESS",
+          paidAt: new Date(),
+        },
+        create: {
+          orderId: order.id,
+          amount: order.total,
+          reference,
+          method: "MPESA",
+          status: "SUCCESS",
+          paidAt: new Date(),
+        },
+      });
+
+      await prisma.order.update({
+        where: { id: order.id },
+        data: { status: newStatus },
+      });
+
+      await prisma.auditLog.create({
+        data: {
+          userId: session.userId,
+          action: "MOBILE_MONEY_CHARGE",
+          details: `Mobile money charge successful for order ${order.orderNumber} via ${provider}.`,
+        },
+      });
+
+      return NextResponse.json({
+        success: true,
+        reference,
+        provider,
+        orderId: order.id,
+        paid: true,
+        message: "Payment completed successfully",
+      });
+    }
+
+    if (chargeStatus === "failed" || chargeStatus === "timeout") {
+      await prisma.payment.upsert({
+        where: { orderId: order.id },
+        update: {
+          reference,
+          method: "MPESA",
+          status: "FAILED",
+        },
+        create: {
+          orderId: order.id,
+          amount: order.total,
+          reference,
+          method: "MPESA",
+          status: "FAILED",
+        },
+      });
+
+      await prisma.order.update({
+        where: { id: order.id },
+        data: { status: "FAILED" },
+      });
+
+      return NextResponse.json(
+        { error: chargeResult.data.gateway_response || "Payment failed" },
+        { status: 400 }
+      );
+    }
+
+    // pending — STK push sent, waiting for user to approve on phone
     await prisma.payment.upsert({
       where: { orderId: order.id },
       update: {
@@ -128,7 +204,11 @@ export async function POST(request: Request) {
       reference,
       provider,
       orderId: order.id,
-      message: provider === "mpesa" ? "STK push sent to your M-Pesa phone" : "Payment request sent to your Airtel Money phone",
+      paid: false,
+      pending: true,
+      message: provider === "mpesa"
+        ? "STK push sent to your M-Pesa phone. Enter your PIN to confirm."
+        : "Payment request sent to your Airtel Money phone.",
     });
   } catch (error) {
     console.error("Mobile money charge error:", error);

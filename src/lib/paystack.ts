@@ -33,6 +33,8 @@ interface ChargeData {
   status: string;
   amount: number;
   currency: string;
+  message: string | null;
+  gateway_response: string;
   transaction: {
     reference: string | null;
   } | null;
@@ -52,28 +54,13 @@ async function paystackFetch<T>(
     },
   });
 
+  const body = await response.json().catch(() => ({ message: response.statusText }));
+
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: response.statusText }));
-    throw new Error(error.message || "Paystack API error");
+    throw new Error(body.message || "Paystack API error");
   }
 
-  return response.json();
-}
-
-export function detectMobileNetwork(phone: string): "mpesa" | "airtel" {
-  const normalized = phone.replace(/^0+/, "254").replace(/^\+/, "").replace(/[^0-9]/g, "");
-  const prefix = normalized.substring(0, 5);
-
-  const safaricomPrefixes = [
-    "25470", "25471", "25472", "25474",
-    "254757", "254758", "254759",
-    "254768", "254769", "254770",
-    "254773", "254785", "254786", "254787",
-    "254788", "254789", "254790",
-    "254792", "254796", "254797", "254798", "254799",
-  ];
-
-  return safaricomPrefixes.some(p => normalized.startsWith(p)) ? "mpesa" : "airtel";
+  return body;
 }
 
 export async function chargeMobileMoney(params: {
@@ -84,7 +71,7 @@ export async function chargeMobileMoney(params: {
   provider: "mpesa" | "airtel";
   metadata?: Record<string, unknown>;
 }) {
-  const amountInKobo = Math.round(params.amount * 100);
+  const amountInKobo = String(Math.round(params.amount * 100));
   const normalizedPhone = params.phone.replace(/^0+/, "254").replace(/^\+/, "").replace(/[^0-9]/g, "");
 
   const body: Record<string, unknown> = {
@@ -125,7 +112,7 @@ export async function initializeTransaction(params: {
   reference?: string;
   metadata?: Record<string, unknown>;
 }) {
-  const amountInKobo = Math.round(params.amount * 100);
+  const amountInKobo = String(Math.round(params.amount * 100));
 
   return paystackFetch<InitializeTransactionData>("/transaction/initialize", {
     method: "POST",
