@@ -72,7 +72,7 @@ export async function chargeMobileMoney(params: {
   metadata?: Record<string, unknown>;
 }) {
   const amountInKobo = String(Math.round(params.amount * 100));
-  const normalizedPhone = params.phone.replace(/^0+/, "254").replace(/^\+/, "").replace(/[^0-9]/g, "");
+  const cleanedPhone = params.phone.replace(/[^0-9]/g, "");
 
   const body: Record<string, unknown> = {
     email: params.email,
@@ -82,17 +82,10 @@ export async function chargeMobileMoney(params: {
     metadata: params.metadata,
   };
 
-  if (params.provider === "mpesa") {
-    body.bank = {
-      code: "MPESA",
-      account_number: normalizedPhone,
-    };
-  } else {
-    body.mobile_money = {
-      phone: normalizedPhone,
-      provider: "airtel",
-    };
-  }
+  body.mobile_money = {
+    phone: cleanedPhone,
+    provider: params.provider,
+  };
 
   return paystackFetch<ChargeData>("/charge", {
     method: "POST",

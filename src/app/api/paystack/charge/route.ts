@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
-import { chargeMobileMoney, formatPhone } from "@/lib/paystack";
+import { chargeMobileMoney } from "@/lib/paystack";
 import { validatePhone } from "@/lib/utils";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
@@ -78,7 +78,6 @@ export async function POST(request: Request) {
       );
     }
 
-    const formattedPhone = formatPhone(phone);
     const reference = `MOB-${order.id}-${Date.now()}`;
 
     const user = await prisma.user.findUnique({
@@ -88,14 +87,14 @@ export async function POST(request: Request) {
     const chargeResult = await chargeMobileMoney({
       email: user?.email || (session.role === "CUSTOMER" ? `${session.userId}@trekim.co.ke` : "pos@trekim.co.ke"),
       amount: order.total,
-      phone: formattedPhone,
+      phone,
       reference,
       provider,
       metadata: {
         orderId: order.id,
         orderNumber: order.orderNumber,
         userId: session.userId,
-        phone: formattedPhone,
+        phone,
       },
     });
 
