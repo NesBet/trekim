@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { verifyTransaction, mapPaystackChannel } from "@/lib/paystack";
+import { verifyTransaction, checkChargeStatus, mapPaystackChannel } from "@/lib/paystack";
 
 export async function POST(request: Request) {
   try {
@@ -14,8 +14,22 @@ export async function POST(request: Request) {
       );
     }
 
-    const result = await verifyTransaction(reference);
-    const { status, channel } = result.data;
+    let status: string;
+    let channel: string | undefined;
+
+    if (reference.startsWith("CARD-")) {
+      const result = await verifyTransaction(reference);
+      status = result.data.status;
+      channel = result.data.channel;
+    } else {
+      try {
+        const result = await checkChargeStatus(reference);
+        status = result.data.status;
+      } catch {
+        const payment = await prisma.payment.findUnique({ where: { reference } });
+        status = payment?.status === "SUCCESS" ? "success" : (payment?.status === "FAILED" ? "failed" : "pending");
+      }
+    }
 
     if (status === "success") {
       const payment = await prisma.payment.findUnique({
@@ -36,7 +50,7 @@ export async function POST(request: Request) {
           where: { reference },
           data: {
             status: "SUCCESS",
-            method: mapPaystackChannel(channel),
+            method: mapPaystackChannel(channel || "mobile_money"),
             paidAt: new Date(),
           },
         });
@@ -49,7 +63,7 @@ export async function POST(request: Request) {
         await prisma.auditLog.create({
           data: {
             action: "PAYMENT_VERIFIED",
-            details: `Payment ${reference} verified for order ${orderData?.orderNumber}. Status set to ${newStatus} (${isPOS ? "POS" : "Online"}).`,
+            details: `Payment ${reference} verified for order ${orderData?.orderNumber}.`,
           },
         });
       }
@@ -57,10 +71,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ status: "success" });
     }
 
-    await prisma.payment.updateMany({
-      where: { reference, status: "PENDING" },
-      data: { status: "FAILED" },
-    });
+    if (status === "failed") {
+      await prisma.payment.updateMany({
+        where: { reference, status: "PENDING" },
+        data: { status: "FAILED" },
+      });
+    }
 
     return NextResponse.json({ status });
   } catch (error) {

@@ -22,23 +22,28 @@ export async function POST(request: Request) {
     }
 
     const event = JSON.parse(body);
-    const { reference, metadata, status, channel } = event.data;
-
-    if (!metadata?.orderId) {
-      return NextResponse.json({ received: true });
-    }
+    const eventData = event.data;
+    const reference = eventData.reference;
+    const metadata = eventData.metadata || {};
+    const status = eventData.status;
+    const channel = eventData.channel || eventData?.authorization?.channel;
 
     if (event.event === "charge.success" && status === "success") {
+      if (!reference) {
+        return NextResponse.json({ received: true });
+      }
+
       const payment = await prisma.payment.findUnique({
         where: { reference },
       });
 
       if (payment && payment.status !== "SUCCESS") {
         const order = await prisma.order.findUnique({
-          where: { id: metadata.orderId },
+          where: { id: metadata.orderId || payment.orderId },
           select: { salespersonId: true, orderNumber: true },
         });
 
+        const orderId = metadata.orderId || payment.orderId;
         const isPOS = !!order?.salespersonId;
         const newStatus = isPOS ? "COMPLETED" : "PROCESSING";
 
@@ -48,12 +53,12 @@ export async function POST(request: Request) {
             status: "SUCCESS",
             method: mapPaystackChannel(channel),
             paidAt: new Date(),
-            mpesaReceipt: event.data.receipt?.number || null,
+            mpesaReceipt: eventData.receipt?.number || null,
           },
         });
 
         await prisma.order.update({
-          where: { id: metadata.orderId },
+          where: { id: orderId },
           data: { status: newStatus },
         });
 
@@ -61,23 +66,25 @@ export async function POST(request: Request) {
           data: {
             userId: metadata.userId || "system",
             action: "PAYMENT_WEBHOOK",
-            details: `Webhook: Payment ${reference} confirmed for order ${metadata.orderNumber}. Status set to ${newStatus} (${isPOS ? "POS" : "Online"}).`,
+            details: `Webhook: Payment ${reference} confirmed for order ${order?.orderNumber || orderId}.`,
           },
         });
       }
     }
 
     if (event.event === "charge.failed") {
-      await prisma.payment.updateMany({
-        where: { reference, status: "PENDING" },
-        data: { status: "FAILED" },
-      });
+      if (reference) {
+        await prisma.payment.updateMany({
+          where: { reference, status: "PENDING" },
+          data: { status: "FAILED" },
+        });
+      }
 
       await prisma.auditLog.create({
         data: {
-          userId: metadata.userId,
+          userId: metadata.userId || "system",
           action: "PAYMENT_FAILED",
-          details: `Webhook: Payment ${reference} failed for order ${metadata.orderNumber}`,
+          details: `Webhook: Payment ${reference} failed for order ${metadata.orderNumber || "unknown"}`,
         },
       });
     }

@@ -64,7 +64,7 @@ export default function DashboardPage() {
     }
   };
 
-  const handleSTKPush = async () => {
+  const handleMobileMoneyCharge = async () => {
     if (!selectedOrder || !validatePhone(phone)) {
       toast.error("Enter a valid Kenyan phone number (e.g., 0712345678)");
       return;
@@ -72,23 +72,24 @@ export default function DashboardPage() {
 
     setStkLoading(true);
     try {
-      const res = await fetch("/api/paystack/initialize", {
+      const res = await fetch("/api/paystack/charge", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           orderId: selectedOrder.id,
+          phone,
         }),
       });
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
 
-      toast.success("STK Push sent to customer's phone");
+      toast.success(`Payment request sent via ${data.provider === "mpesa" ? "M-Pesa" : "Airtel Money"}`);
       setStkModal(false);
       setPhone("");
       fetchOrders();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "STK Push failed");
+      toast.error(err instanceof Error ? err.message : "Payment request failed");
     } finally {
       setStkLoading(false);
     }
@@ -232,11 +233,11 @@ export default function DashboardPage() {
       <Modal
         open={stkModal}
         onClose={() => setStkModal(false)}
-        title="STK Push Payment"
+        title="Mobile Money Payment"
       >
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            Send payment request to customer&apos;s M-Pesa
+            Send payment request to customer&apos;s phone
           </p>
           {selectedOrder && (
             <div className="rounded-lg bg-secondary p-3">
@@ -256,11 +257,11 @@ export default function DashboardPage() {
           />
           <Button
             className="w-full"
-            onClick={handleSTKPush}
+            onClick={handleMobileMoneyCharge}
             loading={stkLoading}
           >
             <Smartphone className="mr-2 h-4 w-4" />
-            Send STK Push
+            Send Payment Request
           </Button>
         </div>
       </Modal>

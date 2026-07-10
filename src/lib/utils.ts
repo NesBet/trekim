@@ -39,5 +39,14 @@ export function validateEmail(email: string): boolean {
 }
 
 export function validatePhone(phone: string): boolean {
-  return /^(\+254|0)[17]\d{8}$/.test(phone);
+  const cleaned = phone.replace(/[^0-9]/g, "");
+  return /^(?:254|0)(?:[17]\d{8}|11\d{8})$/.test(cleaned);
+}
+
+export function formatPhoneForPaystack(phone: string): string {
+  const cleaned = phone.replace(/[^0-9]/g, "");
+  if (cleaned.startsWith("0")) return `254${cleaned.slice(1)}`;
+  if (cleaned.startsWith("+")) return cleaned.slice(1);
+  if (cleaned.startsWith("254")) return cleaned;
+  return `254${cleaned}`;
 }

@@ -24,6 +24,7 @@ import {
   Loader2,
   RotateCcw,
   RefreshCw,
+  Signal,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
@@ -45,7 +46,8 @@ interface CartItem {
   quantity: number;
 }
 
-type StkState = "idle" | "waiting" | "success" | "failed";
+type MobileMoneyState = "idle" | "waiting" | "success" | "failed";
+type PaymentOption = "CASH" | "MOBILE_MONEY";
 
 function ConfettiOverlay() {
   const particles = useRef(
@@ -84,7 +86,26 @@ function ConfettiOverlay() {
   );
 }
 
-function StkWaitingOverlay({ onCancel }: { onCancel: () => void }) {
+function formatPhone(input: string): string {
+  return input.replace(/[^0-9]/g, "");
+}
+
+function detectProvider(phone: string): "mpesa" | "airtel" | null {
+  const cleaned = formatPhone(phone);
+  if (!validatePhone(cleaned)) return null;
+  const normalized = cleaned.startsWith("0") ? `254${cleaned.slice(1)}` : cleaned;
+  const safaricomPrefixes = [
+    "25470", "25471", "25472", "25474",
+    "254757", "254758", "254759",
+    "254768", "254769", "254770",
+    "254773", "254785", "254786", "254787",
+    "254788", "254789", "254790",
+    "254792", "254796", "254797", "254798", "254799",
+  ];
+  return safaricomPrefixes.some(p => normalized.startsWith(p)) ? "mpesa" : "airtel";
+}
+
+function MobileMoneyWaitingOverlay({ provider, onCancel }: { provider: string; onCancel: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
       <div className="bg-background rounded-2xl p-10 max-w-sm w-full mx-4 text-center space-y-6 animate-fade-in shadow-2xl border">
@@ -96,10 +117,14 @@ function StkWaitingOverlay({ onCancel }: { onCancel: () => void }) {
         <div className="space-y-2">
           <h3 className="text-xl font-bold">Waiting for Payment</h3>
           <p className="text-sm text-muted-foreground">
-            A Paystack checkout page has been opened.
-            <br />
-            Complete payment there to confirm this order.
+            {provider === "mpesa"
+              ? "STK push sent to your M-Pesa phone. Enter your PIN to confirm."
+              : "Payment request sent to your Airtel Money phone. Check your phone to complete."}
           </p>
+        </div>
+        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-secondary text-xs font-medium">
+          <Signal className="h-3 w-3" />
+          {provider === "mpesa" ? "M-Pesa" : "Airtel Money"}
         </div>
         <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
           <RefreshCw className="h-4 w-4 animate-spin" />
@@ -123,8 +148,9 @@ export default function POSPage() {
   const [items, setItems] = useState<CartItem[]>([]);
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState<"CASH" | "MPESA" | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentOption | null>(null);
   const [cashAmount, setCashAmount] = useState("");
+  const [mobilePhone, setMobilePhone] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [resultModal, setResultModal] = useState(false);
   const [resultData, setResultData] = useState<{
@@ -133,12 +159,14 @@ export default function POSPage() {
     total: number;
   } | null>(null);
 
-  const [stkState, setStkState] = useState<StkState>("idle");
-  const [stkOrderId, setStkOrderId] = useState<string | null>(null);
-  const [stkPhone, setStkPhone] = useState("");
-  const [stkError, setStkError] = useState("");
+  const [mmState, setMmState] = useState<MobileMoneyState>("idle");
+  const [mmOrderId, setMmOrderId] = useState<string | null>(null);
+  const [mmRef, setMmRef] = useState<string | null>(null);
+  const [mmError, setMmError] = useState("");
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollingCountRef = useRef(0);
+
+  const detectedProvider = mobilePhone ? detectProvider(mobilePhone) : null;
 
   useEffect(() => {
     fetchProducts();
@@ -229,7 +257,7 @@ export default function POSPage() {
   }, []);
 
   const startPolling = useCallback(
-    (orderId: string) => {
+    (ref: string) => {
       pollingCountRef.current = 0;
       if (pollingRef.current) clearInterval(pollingRef.current);
 
@@ -238,25 +266,27 @@ export default function POSPage() {
 
         if (pollingCountRef.current > 60) {
           stopPolling();
-          setStkState("failed");
-          setStkError("Payment confirmation timed out. Please try again.");
+          setMmState("failed");
+          setMmError("Payment confirmation timed out. Please try again.");
           return;
         }
 
         try {
-          const res = await fetch(`/api/orders/${orderId}`);
+          const res = await fetch("/api/paystack/charge-status", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ reference: ref }),
+          });
           if (!res.ok) return;
           const data = await res.json();
 
-          const paymentStatus = data.order?.payment?.status;
-
-          if (paymentStatus === "SUCCESS") {
+          if (data.paid) {
             stopPolling();
-            setStkState("success");
-          } else if (paymentStatus === "FAILED") {
+            setMmState("success");
+          } else if (data.status === "FAILED") {
             stopPolling();
-            setStkState("failed");
-            setStkError("Payment was declined by customer or failed.");
+            setMmState("failed");
+            setMmError("Payment was declined or failed.");
           }
         } catch {
           // continue polling
@@ -266,18 +296,18 @@ export default function POSPage() {
     [stopPolling]
   );
 
-  const handleMpesaSubmit = async () => {
-    if (!validatePhone(stkPhone)) {
+  const handleMobileMoneySubmit = async () => {
+    if (!validatePhone(mobilePhone)) {
       toast.error("Enter a valid Kenyan phone number (e.g., 0712345678)");
       return;
     }
     if (!customerPhone) {
-      setCustomerPhone(stkPhone);
+      setCustomerPhone(mobilePhone);
     }
 
     setSubmitting(true);
-    setStkState("waiting");
-    setStkError("");
+    setMmState("waiting");
+    setMmError("");
 
     try {
       const res = await fetch("/api/orders", {
@@ -290,7 +320,7 @@ export default function POSPage() {
           })),
           paymentMethod: "MPESA",
           customerName: customerName.trim(),
-          customerPhone: customerPhone.trim() || stkPhone,
+          customerPhone: customerPhone.trim() || mobilePhone,
           deliveryLocation: "Walk-in",
         }),
       });
@@ -300,31 +330,28 @@ export default function POSPage() {
 
       const orderId = data.order.id;
 
-      const stkRes = await fetch("/api/paystack/stk", {
+      const chargeRes = await fetch("/api/paystack/charge", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           orderId,
-          phone: stkPhone,
+          phone: mobilePhone,
         }),
       });
 
-      if (!stkRes.ok) {
-        const stkErr = await stkRes.json();
-        throw new Error(stkErr.error || "STK push failed");
+      if (!chargeRes.ok) {
+        const chargeErr = await chargeRes.json();
+        throw new Error(chargeErr.error || "Mobile money charge failed");
       }
 
-      const stkData = await stkRes.json();
-      setStkOrderId(orderId);
+      const chargeData = await chargeRes.json();
+      setMmOrderId(orderId);
+      setMmRef(chargeData.reference);
 
-      if (stkData.authorizationUrl) {
-        window.open(stkData.authorizationUrl, "_blank");
-      }
-
-      startPolling(orderId);
+      startPolling(chargeData.reference);
     } catch (err) {
-      setStkState("failed");
-      setStkError(err instanceof Error ? err.message : "Failed to process payment");
+      setMmState("failed");
+      setMmError(err instanceof Error ? err.message : "Failed to process payment");
     } finally {
       setSubmitting(false);
     }
@@ -393,20 +420,21 @@ export default function POSPage() {
     if (paymentMethod === "CASH") {
       await handleCashSubmit();
     } else {
-      await handleMpesaSubmit();
+      await handleMobileMoneySubmit();
     }
   };
 
   const handleRetry = () => {
-    setStkState("idle");
-    setStkError("");
-    setStkOrderId(null);
+    setMmState("idle");
+    setMmError("");
+    setMmOrderId(null);
+    setMmRef(null);
   };
 
   const handleCancelWaiting = () => {
     stopPolling();
-    setStkState("failed");
-    setStkError("STK push cancelled.");
+    setMmState("failed");
+    setMmError("Payment cancelled.");
   };
 
   return (
@@ -571,7 +599,7 @@ export default function POSPage() {
                 <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <input
                   type="text"
-                  placeholder="Phone (required for M-Pesa)"
+                  placeholder="Phone (required for Mobile Money)"
                   value={customerPhone}
                   onChange={(e) => setCustomerPhone(e.target.value)}
                   className="w-full h-10 rounded-lg border border-input bg-background pl-10 pr-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -596,15 +624,15 @@ export default function POSPage() {
                   Cash
                 </button>
                 <button
-                  onClick={() => setPaymentMethod("MPESA")}
+                  onClick={() => setPaymentMethod("MOBILE_MONEY")}
                   className={`flex items-center justify-center gap-2 p-3 rounded-lg border text-sm font-medium transition-colors ${
-                    paymentMethod === "MPESA"
+                    paymentMethod === "MOBILE_MONEY"
                       ? "bg-trekim-500 text-black border-trekim-500"
                       : "bg-background hover:bg-secondary border-input"
                   }`}
                 >
                   <Smartphone className="h-5 w-5" />
-                  M-Pesa
+                  Mobile Money
                 </button>
               </div>
 
@@ -628,14 +656,24 @@ export default function POSPage() {
                 </div>
               )}
 
-              {paymentMethod === "MPESA" && (
+              {paymentMethod === "MOBILE_MONEY" && (
                 <div className="space-y-2">
                   <Input
-                    label="Phone Number for STK Push"
+                    label="Phone Number"
                     placeholder="0712 345 678"
-                    value={stkPhone}
-                    onChange={(e) => setStkPhone(e.target.value)}
+                    value={mobilePhone}
+                    onChange={(e) => setMobilePhone(e.target.value)}
                   />
+                  {detectedProvider && validatePhone(mobilePhone) && (
+                    <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium ${
+                      detectedProvider === "mpesa"
+                        ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
+                        : "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
+                    }`}>
+                      <Signal className="h-3 w-3" />
+                      {detectedProvider === "mpesa" ? "Safaricom (M-Pesa)" : "Airtel (Airtel Money)"}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -644,17 +682,17 @@ export default function POSPage() {
                 size="lg"
                 onClick={handleSubmit}
                 loading={submitting}
-                disabled={items.length === 0 || !paymentMethod || stkState === "waiting"}
+                disabled={items.length === 0 || !paymentMethod || mmState === "waiting"}
               >
                 {paymentMethod === "CASH" ? (
                   <>
                     <Banknote className="mr-2 h-5 w-5" />
                     Complete Sale
                   </>
-                ) : paymentMethod === "MPESA" ? (
+                ) : paymentMethod === "MOBILE_MONEY" ? (
                   <>
                     <Smartphone className="mr-2 h-5 w-5" />
-                    Send STK Push & Complete
+                    Send Payment Request
                   </>
                 ) : (
                   "Select Payment Method"
@@ -665,11 +703,16 @@ export default function POSPage() {
         </div>
       </div>
 
-      {/* STK Waiting Overlay */}
-      {stkState === "waiting" && <StkWaitingOverlay onCancel={handleCancelWaiting} />}
+      {/* Mobile Money Waiting Overlay */}
+      {mmState === "waiting" && (
+        <MobileMoneyWaitingOverlay
+          provider={detectedProvider || "mpesa"}
+          onCancel={handleCancelWaiting}
+        />
+      )}
 
-      {/* STK Success Overlay */}
-      {stkState === "success" && (
+      {/* Mobile Money Success Overlay */}
+      {mmState === "success" && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <ConfettiOverlay />
           <div className="bg-background rounded-2xl p-10 max-w-sm w-full mx-4 text-center space-y-6 animate-fade-in shadow-2xl border relative z-10">
@@ -679,7 +722,7 @@ export default function POSPage() {
             <div className="space-y-1">
               <h3 className="text-2xl font-bold text-green-600 dark:text-green-400">Payment Successful!</h3>
               <p className="text-sm text-muted-foreground">
-                M-Pesa payment confirmed for this order.
+                Mobile money payment confirmed.
               </p>
             </div>
             <div className="rounded-lg bg-secondary/50 p-4 space-y-1">
@@ -690,13 +733,14 @@ export default function POSPage() {
               <Button
                 className="flex-1"
                 onClick={() => {
-                  setStkState("idle");
+                  setMmState("idle");
                   setItems([]);
                   setCustomerName("");
                   setCustomerPhone("");
-                  setStkPhone("");
+                  setMobilePhone("");
                   setPaymentMethod(null);
-                  setStkOrderId(null);
+                  setMmOrderId(null);
+                  setMmRef(null);
                 }}
               >
                 New Order
@@ -710,8 +754,8 @@ export default function POSPage() {
         </div>
       )}
 
-      {/* STK Failed Overlay */}
-      {stkState === "failed" && (
+      {/* Mobile Money Failed Overlay */}
+      {mmState === "failed" && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="bg-background rounded-2xl p-10 max-w-sm w-full mx-4 text-center space-y-6 animate-fade-in shadow-2xl border">
             <div className="mx-auto w-20 h-20 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
@@ -719,12 +763,12 @@ export default function POSPage() {
             </div>
             <div className="space-y-1">
               <h3 className="text-2xl font-bold text-red-600 dark:text-red-400">Payment Failed</h3>
-              <p className="text-sm text-muted-foreground">{stkError || "Something went wrong."}</p>
+              <p className="text-sm text-muted-foreground">{mmError || "Something went wrong."}</p>
             </div>
             <div className="rounded-lg bg-secondary/50 p-4 space-y-1">
               <p className="text-lg font-semibold">{formatCurrency(total)}</p>
               <p className="text-xs text-muted-foreground">Amount</p>
-              <p className="text-sm font-medium">{stkPhone}</p>
+              <p className="text-sm font-medium">{mobilePhone}</p>
               <p className="text-xs text-muted-foreground">Phone Number</p>
             </div>
             <div className="flex gap-3 pt-2">
@@ -732,7 +776,7 @@ export default function POSPage() {
                 <RotateCcw className="mr-2 h-4 w-4" />
                 Try Again
               </Button>
-              <Button variant="ghost" className="flex-1" onClick={() => setStkState("idle")}>
+              <Button variant="ghost" className="flex-1" onClick={() => setMmState("idle")}>
                 Cancel
               </Button>
             </div>

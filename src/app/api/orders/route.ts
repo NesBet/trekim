@@ -122,7 +122,9 @@ export async function POST(request: Request) {
     const orderNumber = generateOrderNumber();
 
     const isCash = paymentMethod === "CASH";
+    const isMobileMoney = paymentMethod === "MPESA";
     const isSalesperson = session.role !== "CUSTOMER";
+    const orderStatus = isCash ? "COMPLETED" : "PENDING";
 
     const order = await prisma.order.create({
       data: {
@@ -132,7 +134,7 @@ export async function POST(request: Request) {
         customerPhone: customerPhone || null,
         salespersonId: isSalesperson ? session.userId : null,
         total,
-        status: isCash ? "COMPLETED" : "PENDING",
+        status: orderStatus,
         deliveryLocation: deliveryLocation || null,
         items: { create: orderItems },
       },
@@ -175,7 +177,27 @@ export async function POST(request: Request) {
       });
     }
 
-    if (session.role === "CUSTOMER") {
+    if (isMobileMoney) {
+      const ref = `MOB-${orderNumber}-${Date.now()}`;
+      payment = await prisma.payment.create({
+        data: {
+          orderId: order.id,
+          amount: total,
+          reference: ref,
+          method: "MPESA",
+          status: "PENDING",
+        },
+      });
+      await prisma.auditLog.create({
+        data: {
+          userId: session.userId,
+          action: "MOBILE_MONEY_ORDER",
+          details: `Order ${orderNumber} created for mobile money payment.`,
+        },
+      });
+    }
+
+    if (session.role === "CUSTOMER" && !isMobileMoney) {
       await prisma.cartItem.deleteMany({
         where: { userId: session.userId },
       });
@@ -185,7 +207,7 @@ export async function POST(request: Request) {
       data: {
         userId: session.userId,
         action: "CREATE_ORDER",
-        details: `Order ${orderNumber} created. Total: KES ${total}${isCash ? ". Cash payment completed." : ""}`,
+        details: `Order ${orderNumber} created. Total: KES ${total}`,
       },
     });
 
