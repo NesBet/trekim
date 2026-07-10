@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Modal } from "@/components/ui/modal";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import {
   ShoppingBag,
@@ -12,8 +13,11 @@ import {
   X,
   ChevronDown,
   Check,
+  CreditCard,
+  ExternalLink,
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 
 interface Order {
@@ -114,12 +118,15 @@ function Dropdown({
 }
 
 export default function OrdersPage() {
+  const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [orderStatus, setOrderStatus] = useState<string | null>(null);
   const [payStatus, setPayStatus] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [paying, setPaying] = useState(false);
 
   useEffect(() => {
     if (!authLoading && user) {
@@ -137,7 +144,7 @@ export default function OrdersPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setOrders(data.orders);
-    } catch (err) {
+    } catch {
       toast.error("Failed to load orders");
     } finally {
       setLoading(false);
@@ -151,6 +158,61 @@ export default function OrdersPage() {
     }
   }, [orderStatus, payStatus]);
 
+  const isUnpaid = (order: Order) => {
+    const ps = order.payment?.status;
+    return ps !== "SUCCESS";
+  };
+
+  const handlePayNow = async (order: Order) => {
+    setPaying(true);
+    try {
+      const payRes = await fetch("/api/paystack/initialize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: order.id }),
+      });
+
+      if (payRes.status === 400) {
+        const err = await payRes.json();
+        toast.error(err.error);
+        setSelectedOrder(null);
+        fetchOrders();
+        return;
+      }
+
+      const payData = await payRes.json();
+      if (!payRes.ok) throw new Error(payData.error || "Payment initialization failed");
+
+      const PaystackPop = (await import("@paystack/inline-js")).default;
+      const popup = new PaystackPop();
+
+      popup.resumeTransaction(payData.accessCode, {
+        onSuccess: async () => {
+          await fetch("/api/paystack/verify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ reference: payData.reference }),
+          }).catch(() => {});
+          setSelectedOrder(null);
+          fetchOrders();
+          toast.success("Payment successful!");
+        },
+        onCancel: () => {
+          setSelectedOrder(null);
+          toast.error("Payment was cancelled");
+        },
+        onError: () => {
+          setSelectedOrder(null);
+          toast.error("Payment could not be completed");
+        },
+      });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Payment failed");
+    } finally {
+      setPaying(false);
+    }
+  };
+
   const filtered = orders.filter((o) => {
     if (!search) return true;
     const q = search.toLowerCase();
@@ -160,6 +222,13 @@ export default function OrdersPage() {
       (o.deliveryLocation || "").toLowerCase().includes(q)
     );
   });
+
+  const getPaymentLabel = (order: Order) => {
+    const ps = order.payment?.status;
+    if (ps === "SUCCESS") return "Paid";
+    if (ps === "FAILED") return "Failed";
+    return "Unpaid";
+  };
 
   if (authLoading) {
     return (
@@ -278,84 +347,145 @@ export default function OrdersPage() {
       ) : (
         <div className="space-y-4">
           {filtered.map((order) => (
-            <Card key={order.id}>
-              <CardContent className="p-6">
-                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-3 mb-1 flex-wrap">
-                      <h3 className="font-semibold text-lg">
-                        {order.orderNumber}
-                      </h3>
-                      <span
-                        className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          statusColors[order.status] || ""
-                        }`}
-                      >
-                        {order.status}
-                      </span>
-                      <span
-                        className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          paymentStatusColors[order.payment?.status || "PENDING"] || ""
-                        }`}
-                      >
-                        {order.payment?.status === "SUCCESS"
-                          ? "Paid"
-                          : order.payment?.status === "FAILED"
-                          ? "Failed"
-                          : "Unpaid"}
-                      </span>
+            <button
+              key={order.id}
+              onClick={() => setSelectedOrder(order)}
+              className="w-full text-left"
+            >
+              <Card className="cursor-pointer hover:shadow-md transition-shadow">
+                <CardContent className="p-6">
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-3 mb-1 flex-wrap">
+                        <h3 className="font-semibold text-lg">
+                          {order.orderNumber}
+                        </h3>
+                        <span
+                          className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            statusColors[order.status] || ""
+                          }`}
+                        >
+                          {order.status}
+                        </span>
+                        <span
+                          className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            paymentStatusColors[order.payment?.status || "PENDING"] || ""
+                          }`}
+                        >
+                          {getPaymentLabel(order)}
+                        </span>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {formatDate(order.createdAt)}
+                      </p>
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                      {formatDate(order.createdAt)}
-                    </p>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <p className="text-xl font-bold text-trekim-500">
+                        {formatCurrency(order.total)}
+                      </p>
+                      <ExternalLink className="h-4 w-4 text-muted-foreground" />
+                    </div>
                   </div>
-                  <div className="text-left sm:text-right shrink-0">
-                    <p className="text-xl font-bold text-trekim-500">
-                      {formatCurrency(order.total)}
-                    </p>
-                  </div>
-                </div>
 
-                {order.deliveryLocation && (
-                  <div className="mb-4 text-sm text-muted-foreground">
-                    <span className="font-medium text-foreground">
-                      Delivery:
-                    </span>{" "}
-                    {order.deliveryLocation}
-                  </div>
-                )}
-
-                <div className="border-t pt-4">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-muted-foreground">
-                        <th className="text-left pb-2 font-medium">Item</th>
-                        <th className="text-center pb-2 font-medium">Qty</th>
-                        <th className="text-right pb-2 font-medium">Price</th>
-                        <th className="text-right pb-2 font-medium">Total</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {order.items.map((item, idx) => (
-                        <tr key={idx} className="border-t">
-                          <td className="py-2">{item.product.name}</td>
-                          <td className="py-2 text-center">{item.quantity}</td>
-                          <td className="py-2 text-right">
-                            {formatCurrency(item.price)}
-                          </td>
-                          <td className="py-2 text-right font-medium">
-                            {formatCurrency(item.price * item.quantity)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
+                  {order.deliveryLocation && (
+                    <div className="text-sm text-muted-foreground">
+                      <span className="font-medium text-foreground">
+                        Delivery:
+                      </span>{" "}
+                      {order.deliveryLocation}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </button>
           ))}
         </div>
       )}
+
+      <Modal
+        open={selectedOrder !== null}
+        onClose={() => setSelectedOrder(null)}
+        title={selectedOrder?.orderNumber || "Order Details"}
+      >
+        {selectedOrder && (
+          <div className="space-y-6">
+            <div className="flex items-center gap-3 flex-wrap">
+              <span
+                className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                  statusColors[selectedOrder.status] || ""
+                }`}
+              >
+                {selectedOrder.status}
+              </span>
+              <span
+                className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                  paymentStatusColors[selectedOrder.payment?.status || "PENDING"] || ""
+                }`}
+              >
+                {getPaymentLabel(selectedOrder)}
+              </span>
+            </div>
+
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-muted-foreground">
+                  <th className="text-left pb-2 font-medium">Item</th>
+                  <th className="text-center pb-2 font-medium">Qty</th>
+                  <th className="text-right pb-2 font-medium">Price</th>
+                  <th className="text-right pb-2 font-medium">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {selectedOrder.items.map((item, idx) => (
+                  <tr key={idx} className="border-t">
+                    <td className="py-2">{item.product.name}</td>
+                    <td className="py-2 text-center">{item.quantity}</td>
+                    <td className="py-2 text-right">
+                      {formatCurrency(item.price)}
+                    </td>
+                    <td className="py-2 text-right font-medium">
+                      {formatCurrency(item.price * item.quantity)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            <div className="border-t pt-4 flex items-center justify-between">
+              <span className="font-semibold">Total</span>
+              <span className="text-xl font-bold text-trekim-500">
+                {formatCurrency(selectedOrder.total)}
+              </span>
+            </div>
+
+            {selectedOrder.deliveryLocation && (
+              <div className="text-sm text-muted-foreground">
+                <span className="font-medium text-foreground">Delivery:</span>{" "}
+                {selectedOrder.deliveryLocation}
+              </div>
+            )}
+
+            {selectedOrder.payment?.method && selectedOrder.payment.status === "SUCCESS" && (
+              <div className="text-sm text-muted-foreground">
+                <span className="font-medium text-foreground">Payment Method:</span>{" "}
+                {selectedOrder.payment.method}
+              </div>
+            )}
+
+            {isUnpaid(selectedOrder) && (
+              <Button
+                className="w-full"
+                size="lg"
+                onClick={() => handlePayNow(selectedOrder)}
+                loading={paying}
+              >
+                <CreditCard className="mr-2 h-5 w-5" />
+                Pay Now — {formatCurrency(selectedOrder.total)}
+              </Button>
+            )}
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }
