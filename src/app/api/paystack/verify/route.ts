@@ -72,6 +72,18 @@ export async function POST(request: Request) {
     }
 
     if (status === "failed") {
+      const failedPayment = await prisma.payment.findUnique({
+        where: { reference },
+        select: { orderId: true },
+      });
+
+      if (failedPayment) {
+        await prisma.order.update({
+          where: { id: failedPayment.orderId },
+          data: { status: "FAILED" },
+        });
+      }
+
       await prisma.payment.updateMany({
         where: { reference, status: "PENDING" },
         data: { status: "FAILED" },

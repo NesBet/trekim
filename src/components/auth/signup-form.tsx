@@ -53,7 +53,7 @@ export function SignupForm() {
         phone: form.phone,
         password: form.password,
       });
-      window.location.href = "/";
+      window.location.href = "/inventory";
     } catch (err) {
       setError(err instanceof Error ? err.message : "Signup failed");
     } finally {

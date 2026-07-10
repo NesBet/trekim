@@ -47,7 +47,7 @@ interface CartItem {
 }
 
 type MobileMoneyState = "idle" | "waiting" | "success" | "failed";
-type PaymentOption = "CASH" | "MOBILE_MONEY";
+type PaymentOption = "CASH" | "MPESA" | "AIRTEL";
 
 function ConfettiOverlay() {
   const particles = useRef(
@@ -84,25 +84,6 @@ function ConfettiOverlay() {
       ))}
     </div>
   );
-}
-
-function formatPhone(input: string): string {
-  return input.replace(/[^0-9]/g, "");
-}
-
-function detectProvider(phone: string): "mpesa" | "airtel" | null {
-  const cleaned = formatPhone(phone);
-  if (!validatePhone(cleaned)) return null;
-  const normalized = cleaned.startsWith("0") ? `254${cleaned.slice(1)}` : cleaned;
-  const safaricomPrefixes = [
-    "25470", "25471", "25472", "25474",
-    "254757", "254758", "254759",
-    "254768", "254769", "254770",
-    "254773", "254785", "254786", "254787",
-    "254788", "254789", "254790",
-    "254792", "254796", "254797", "254798", "254799",
-  ];
-  return safaricomPrefixes.some(p => normalized.startsWith(p)) ? "mpesa" : "airtel";
 }
 
 function MobileMoneyWaitingOverlay({ provider, onCancel }: { provider: string; onCancel: () => void }) {
@@ -165,8 +146,6 @@ export default function POSPage() {
   const [mmError, setMmError] = useState("");
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollingCountRef = useRef(0);
-
-  const detectedProvider = mobilePhone ? detectProvider(mobilePhone) : null;
 
   useEffect(() => {
     fetchProducts();
@@ -336,6 +315,7 @@ export default function POSPage() {
         body: JSON.stringify({
           orderId,
           phone: mobilePhone,
+          provider: paymentMethod === "MPESA" ? "mpesa" : "airtel",
         }),
       });
 
@@ -611,28 +591,39 @@ export default function POSPage() {
           <Card>
             <CardContent className="p-4 space-y-3">
               <h3 className="text-sm font-semibold">Payment Method</h3>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 <button
                   onClick={() => setPaymentMethod("CASH")}
-                  className={`flex items-center justify-center gap-2 p-3 rounded-lg border text-sm font-medium transition-colors ${
+                  className={`flex items-center justify-center gap-1 p-3 rounded-lg border text-xs font-medium transition-colors ${
                     paymentMethod === "CASH"
                       ? "bg-trekim-500 text-black border-trekim-500"
                       : "bg-background hover:bg-secondary border-input"
                   }`}
                 >
-                  <Banknote className="h-5 w-5" />
+                  <Banknote className="h-4 w-4" />
                   Cash
                 </button>
                 <button
-                  onClick={() => setPaymentMethod("MOBILE_MONEY")}
-                  className={`flex items-center justify-center gap-2 p-3 rounded-lg border text-sm font-medium transition-colors ${
-                    paymentMethod === "MOBILE_MONEY"
-                      ? "bg-trekim-500 text-black border-trekim-500"
+                  onClick={() => setPaymentMethod("MPESA")}
+                  className={`flex items-center justify-center gap-1 p-3 rounded-lg border text-xs font-medium transition-colors ${
+                    paymentMethod === "MPESA"
+                      ? "bg-green-600 text-white border-green-600"
                       : "bg-background hover:bg-secondary border-input"
                   }`}
                 >
-                  <Smartphone className="h-5 w-5" />
-                  Mobile Money
+                  <Smartphone className="h-4 w-4" />
+                  M-Pesa
+                </button>
+                <button
+                  onClick={() => setPaymentMethod("AIRTEL")}
+                  className={`flex items-center justify-center gap-1 p-3 rounded-lg border text-xs font-medium transition-colors ${
+                    paymentMethod === "AIRTEL"
+                      ? "bg-blue-600 text-white border-blue-600"
+                      : "bg-background hover:bg-secondary border-input"
+                  }`}
+                >
+                  <Smartphone className="h-4 w-4" />
+                  Airtel
                 </button>
               </div>
 
@@ -656,24 +647,14 @@ export default function POSPage() {
                 </div>
               )}
 
-              {paymentMethod === "MOBILE_MONEY" && (
+              {(paymentMethod === "MPESA" || paymentMethod === "AIRTEL") && (
                 <div className="space-y-2">
                   <Input
-                    label="Phone Number"
+                    label={`Phone Number (${paymentMethod === "MPESA" ? "M-Pesa" : "Airtel Money"})`}
                     placeholder="0712 345 678"
                     value={mobilePhone}
                     onChange={(e) => setMobilePhone(e.target.value)}
                   />
-                  {detectedProvider && validatePhone(mobilePhone) && (
-                    <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium ${
-                      detectedProvider === "mpesa"
-                        ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
-                        : "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
-                    }`}>
-                      <Signal className="h-3 w-3" />
-                      {detectedProvider === "mpesa" ? "Safaricom (M-Pesa)" : "Airtel (Airtel Money)"}
-                    </div>
-                  )}
                 </div>
               )}
 
@@ -689,10 +670,15 @@ export default function POSPage() {
                     <Banknote className="mr-2 h-5 w-5" />
                     Complete Sale
                   </>
-                ) : paymentMethod === "MOBILE_MONEY" ? (
+                ) : paymentMethod === "MPESA" ? (
                   <>
                     <Smartphone className="mr-2 h-5 w-5" />
-                    Send Payment Request
+                    Send M-Pesa Payment
+                  </>
+                ) : paymentMethod === "AIRTEL" ? (
+                  <>
+                    <Smartphone className="mr-2 h-5 w-5" />
+                    Send Airtel Money
                   </>
                 ) : (
                   "Select Payment Method"
@@ -706,7 +692,7 @@ export default function POSPage() {
       {/* Mobile Money Waiting Overlay */}
       {mmState === "waiting" && (
         <MobileMoneyWaitingOverlay
-          provider={detectedProvider || "mpesa"}
+          provider={paymentMethod === "MPESA" ? "mpesa" : "airtel"}
           onCancel={handleCancelWaiting}
         />
       )}

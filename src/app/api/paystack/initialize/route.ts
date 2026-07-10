@@ -45,6 +45,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    if (order.status === "FAILED" || order.status === "CANCELLED") {
+      return NextResponse.json(
+        { error: "This order can no longer be paid" },
+        { status: 400 }
+      );
+    }
+
     if (order.payment?.status === "SUCCESS") {
       return NextResponse.json(
         { error: "Order already paid" },

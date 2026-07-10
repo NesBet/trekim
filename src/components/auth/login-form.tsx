@@ -21,10 +21,8 @@ export function LoginForm() {
     setLoading(true);
 
     try {
-      const user = await login(form.email, form.password);
-      if (user.role === "ADMIN") window.location.href = "/admin";
-      else if (user.role === "SALESPERSON") window.location.href = "/dashboard";
-      else window.location.href = "/";
+      await login(form.email, form.password);
+      window.location.href = "/inventory";
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {

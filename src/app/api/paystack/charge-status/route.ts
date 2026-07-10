@@ -82,6 +82,11 @@ export async function POST(request: Request) {
         data: { status: "FAILED" },
       });
 
+      await prisma.order.update({
+        where: { id: order.id },
+        data: { status: "FAILED" },
+      });
+
       return NextResponse.json({ status: "FAILED", paid: false });
     }
 

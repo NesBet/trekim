@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
-import { chargeMobileMoney, detectMobileNetwork, formatPhone } from "@/lib/paystack";
+import { chargeMobileMoney, formatPhone } from "@/lib/paystack";
 import { validatePhone } from "@/lib/utils";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
@@ -24,11 +24,18 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { orderId, phone } = body;
+    const { orderId, phone, provider } = body;
 
     if (!orderId) {
       return NextResponse.json(
         { error: "Order ID is required" },
+        { status: 400 }
+      );
+    }
+
+    if (!provider || !["mpesa", "airtel"].includes(provider)) {
+      return NextResponse.json(
+        { error: "Valid provider (mpesa or airtel) is required" },
         { status: 400 }
       );
     }
@@ -49,6 +56,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
 
+    if (order.status === "FAILED" || order.status === "CANCELLED") {
+      return NextResponse.json(
+        { error: "This order can no longer be paid" },
+        { status: 400 }
+      );
+    }
+
     if (session.role === "CUSTOMER" && order.customerId !== session.userId) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
@@ -65,18 +79,18 @@ export async function POST(request: Request) {
     }
 
     const formattedPhone = formatPhone(phone);
-    const provider = detectMobileNetwork(formattedPhone);
     const reference = `MOB-${order.id}-${Date.now()}`;
 
     const user = await prisma.user.findUnique({
       where: { id: session.userId },
     });
 
-    const chargeResult = await chargeMobileMoney({
+    await chargeMobileMoney({
       email: user?.email || (session.role === "CUSTOMER" ? `${session.userId}@trekim.co.ke` : "pos@trekim.co.ke"),
       amount: order.total,
       phone: formattedPhone,
       reference,
+      provider,
       metadata: {
         orderId: order.id,
         orderNumber: order.orderNumber,

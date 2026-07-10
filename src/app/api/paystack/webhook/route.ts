@@ -78,13 +78,25 @@ export async function POST(request: Request) {
           where: { reference, status: "PENDING" },
           data: { status: "FAILED" },
         });
+
+        const failedPayment = await prisma.payment.findUnique({
+          where: { reference },
+          select: { orderId: true },
+        });
+
+        if (failedPayment) {
+          await prisma.order.update({
+            where: { id: failedPayment.orderId },
+            data: { status: "FAILED" },
+          });
+        }
       }
 
       await prisma.auditLog.create({
         data: {
           userId: metadata.userId || "system",
           action: "PAYMENT_FAILED",
-          details: `Webhook: Payment ${reference} failed for order ${metadata.orderNumber || "unknown"}`,
+          details: `Webhook: Payment ${reference} failed for order ${metadata.orderNumber || "unknown"}. Order set to FAILED.`,
         },
       });
     }

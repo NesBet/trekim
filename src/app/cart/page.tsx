@@ -16,8 +16,6 @@ import {
   Phone,
   User,
   Mail,
-  Signal,
-  Loader2,
   CheckCircle,
   XCircle,
   RefreshCw,
@@ -33,35 +31,18 @@ interface CartItem {
   quantity: number;
 }
 
-function detectProvider(phone: string): "mpesa" | "airtel" | null {
-  const cleaned = phone.replace(/[^0-9]/g, "");
-  if (!validatePhone(cleaned)) return null;
-  const normalized = cleaned.startsWith("0") ? `254${cleaned.slice(1)}` : cleaned;
-  const safaricomPrefixes = [
-    "25470", "25471", "25472", "25474",
-    "254757", "254758", "254759",
-    "254768", "254769", "254770",
-    "254773", "254785", "254786", "254787",
-    "254788", "254789", "254790",
-    "254792", "254796", "254797", "254798", "254799",
-  ];
-  return safaricomPrefixes.some(p => normalized.startsWith(p)) ? "mpesa" : "airtel";
-}
-
 function CartContent() {
   const router = useRouter();
   const { user } = useAuth();
   const [items, setItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [deliveryLocation, setDeliveryLocation] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState<"CARD" | "MOBILE_MONEY" | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<"CARD" | "MPESA" | "AIRTEL" | null>(null);
   const [mobilePhone, setMobilePhone] = useState("");
   const [mmState, setMmState] = useState<"idle" | "waiting" | "success" | "failed">("idle");
   const [mmError, setMmError] = useState("");
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollingCountRef = useRef(0);
-
-  const detectedProvider = mobilePhone ? detectProvider(mobilePhone) : null;
 
   useEffect(() => {
     const stored = localStorage.getItem("trekim_cart");
@@ -238,12 +219,14 @@ function CartContent() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
 
+      const provider = paymentMethod === "MPESA" ? "mpesa" : "airtel";
       const chargeRes = await fetch("/api/paystack/charge", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           orderId: data.order.id,
           phone: mobilePhone,
+          provider,
         }),
       });
 
@@ -272,6 +255,8 @@ function CartContent() {
       await handleMobileMoneyCheckout();
     }
   };
+
+  const providerLabel = paymentMethod === "MPESA" ? "M-Pesa" : paymentMethod === "AIRTEL" ? "Airtel Money" : null;
 
   if (items.length === 0 && mmState !== "waiting" && mmState !== "success") {
     return (
@@ -371,49 +356,50 @@ function CartContent() {
         <Card>
           <CardContent className="p-6 space-y-4">
             <h2 className="text-xl font-semibold">Payment Method</h2>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               <button
                 onClick={() => setPaymentMethod("CARD")}
-                className={`flex items-center justify-center gap-2 p-3 rounded-lg border text-sm font-medium transition-colors ${
+                className={`flex items-center justify-center gap-1 p-3 rounded-lg border text-xs font-medium transition-colors ${
                   paymentMethod === "CARD"
                     ? "bg-trekim-500 text-black border-trekim-500"
                     : "bg-background hover:bg-secondary border-input"
                 }`}
               >
-                <CreditCard className="h-5 w-5" />
+                <CreditCard className="h-4 w-4" />
                 Card
               </button>
               <button
-                onClick={() => setPaymentMethod("MOBILE_MONEY")}
-                className={`flex items-center justify-center gap-2 p-3 rounded-lg border text-sm font-medium transition-colors ${
-                  paymentMethod === "MOBILE_MONEY"
-                    ? "bg-trekim-500 text-black border-trekim-500"
+                onClick={() => { setPaymentMethod("MPESA"); setMobilePhone(""); }}
+                className={`flex items-center justify-center gap-1 p-3 rounded-lg border text-xs font-medium transition-colors ${
+                  paymentMethod === "MPESA"
+                    ? "bg-green-600 text-white border-green-600"
                     : "bg-background hover:bg-secondary border-input"
                 }`}
               >
-                <Smartphone className="h-5 w-5" />
-                Mobile Money
+                <Smartphone className="h-4 w-4" />
+                M-Pesa
+              </button>
+              <button
+                onClick={() => { setPaymentMethod("AIRTEL"); setMobilePhone(""); }}
+                className={`flex items-center justify-center gap-1 p-3 rounded-lg border text-xs font-medium transition-colors ${
+                  paymentMethod === "AIRTEL"
+                    ? "bg-blue-600 text-white border-blue-600"
+                    : "bg-background hover:bg-secondary border-input"
+                }`}
+              >
+                <Smartphone className="h-4 w-4" />
+                Airtel
               </button>
             </div>
 
-            {paymentMethod === "MOBILE_MONEY" && (
+            {(paymentMethod === "MPESA" || paymentMethod === "AIRTEL") && (
               <div className="space-y-2">
                 <Input
-                  label="Phone Number"
+                  label={`Phone Number (${providerLabel})`}
                   placeholder="0712 345 678"
                   value={mobilePhone}
                   onChange={(e) => setMobilePhone(e.target.value)}
                 />
-                {detectedProvider && validatePhone(mobilePhone) && (
-                  <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium ${
-                    detectedProvider === "mpesa"
-                      ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
-                      : "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
-                  }`}>
-                    <Signal className="h-3 w-3" />
-                    {detectedProvider === "mpesa" ? "Safaricom (M-Pesa)" : "Airtel (Airtel Money)"}
-                  </div>
-                )}
               </div>
             )}
 
@@ -452,10 +438,15 @@ function CartContent() {
                   <CreditCard className="mr-2 h-5 w-5" />
                   Proceed to Payment
                 </>
-              ) : paymentMethod === "MOBILE_MONEY" ? (
+              ) : paymentMethod === "MPESA" ? (
                 <>
                   <Smartphone className="mr-2 h-5 w-5" />
-                  Send Payment Request
+                  Pay with M-Pesa
+                </>
+              ) : paymentMethod === "AIRTEL" ? (
+                <>
+                  <Smartphone className="mr-2 h-5 w-5" />
+                  Pay with Airtel Money
                 </>
               ) : (
                 "Select Payment Method"
@@ -482,7 +473,7 @@ function CartContent() {
             <div className="space-y-2">
               <h3 className="text-xl font-bold">Waiting for Payment</h3>
               <p className="text-sm text-muted-foreground">
-                {detectedProvider === "mpesa"
+                {paymentMethod === "MPESA"
                   ? "STK push sent to your phone. Enter your M-Pesa PIN to confirm."
                   : "Payment request sent. Check your Airtel Money phone to complete."}
               </p>

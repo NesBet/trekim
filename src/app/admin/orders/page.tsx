@@ -43,7 +43,7 @@ interface Order {
   payment: { status: string; reference: string; method: string } | null;
 }
 
-const ALL_STATUSES = ["PENDING", "CONFIRMED", "PROCESSING", "COMPLETED", "CANCELLED"];
+const ALL_STATUSES = ["PENDING", "CONFIRMED", "PROCESSING", "COMPLETED", "CANCELLED", "FAILED"];
 
 function StatusDropdown({
   value,
@@ -327,6 +327,7 @@ export default function AdminOrdersPage() {
     PROCESSING: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
     COMPLETED: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
     CANCELLED: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
+    FAILED: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
   };
 
   const hasActiveFilter = customerFilter || salespersonFilter || paymentMethodFilter;
@@ -346,6 +347,11 @@ export default function AdminOrdersPage() {
     {
       label: "Cancelled",
       value: filteredOrders.filter((o) => o.status === "CANCELLED").length,
+      icon: XCircle,
+    },
+    {
+      label: "Failed",
+      value: filteredOrders.filter((o) => o.status === "FAILED").length,
       icon: XCircle,
     },
   ];
@@ -591,7 +597,7 @@ export default function AdminOrdersPage() {
                           Complete
                         </Button>
                       )}
-                      {!["COMPLETED", "CANCELLED"].includes(
+                      {!["COMPLETED", "CANCELLED", "FAILED"].includes(
                         order.status
                       ) && (
                         <Button

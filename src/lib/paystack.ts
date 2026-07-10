@@ -81,10 +81,10 @@ export async function chargeMobileMoney(params: {
   amount: number;
   phone: string;
   reference: string;
+  provider: "mpesa" | "airtel";
   metadata?: Record<string, unknown>;
 }) {
   const amountInKobo = Math.round(params.amount * 100);
-  const provider = detectMobileNetwork(params.phone);
   const normalizedPhone = params.phone.replace(/^0+/, "254").replace(/^\+/, "").replace(/[^0-9]/g, "");
 
   return paystackFetch<ChargeData>("/charge", {
@@ -97,7 +97,7 @@ export async function chargeMobileMoney(params: {
       metadata: params.metadata,
       mobile_money: {
         phone: normalizedPhone,
-        provider,
+        provider: params.provider,
       },
     }),
   });

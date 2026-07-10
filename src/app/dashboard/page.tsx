@@ -46,6 +46,7 @@ export default function DashboardPage() {
   const [stkModal, setStkModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [phone, setPhone] = useState("");
+  const [mobileProvider, setMobileProvider] = useState<"mpesa" | "airtel">("mpesa");
   const [stkLoading, setStkLoading] = useState(false);
 
   useEffect(() => {
@@ -78,6 +79,7 @@ export default function DashboardPage() {
         body: JSON.stringify({
           orderId: selectedOrder.id,
           phone,
+          provider: mobileProvider,
         }),
       });
 
@@ -101,6 +103,7 @@ export default function DashboardPage() {
     PROCESSING: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
     COMPLETED: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
     CANCELLED: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
+    FAILED: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
   };
 
   const stats = [
@@ -249,6 +252,30 @@ export default function DashboardPage() {
               </p>
             </div>
           )}
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => setMobileProvider("mpesa")}
+              className={`flex items-center justify-center gap-2 p-3 rounded-lg border text-sm font-medium transition-colors ${
+                mobileProvider === "mpesa"
+                  ? "bg-green-600 text-white border-green-600"
+                  : "bg-background hover:bg-secondary border-input"
+              }`}
+            >
+              <Smartphone className="h-4 w-4" />
+              M-Pesa
+            </button>
+            <button
+              onClick={() => setMobileProvider("airtel")}
+              className={`flex items-center justify-center gap-2 p-3 rounded-lg border text-sm font-medium transition-colors ${
+                mobileProvider === "airtel"
+                  ? "bg-blue-600 text-white border-blue-600"
+                  : "bg-background hover:bg-secondary border-input"
+              }`}
+            >
+              <Smartphone className="h-4 w-4" />
+              Airtel Money
+            </button>
+          </div>
           <Input
             label="Customer Phone Number"
             placeholder="0712 345 678"
@@ -261,7 +288,7 @@ export default function DashboardPage() {
             loading={stkLoading}
           >
             <Smartphone className="mr-2 h-4 w-4" />
-            Send Payment Request
+            Send {mobileProvider === "mpesa" ? "M-Pesa" : "Airtel Money"} Request
           </Button>
         </div>
       </Modal>
