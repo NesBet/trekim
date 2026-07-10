@@ -14,7 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatCurrency, formatDate, validatePhone } from "@/lib/utils";
+import { formatCurrency, formatDate } from "@/lib/utils";
 import {
   Package,
   Clock,
@@ -45,8 +45,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [stkModal, setStkModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [phone, setPhone] = useState("");
-  const [mobileProvider, setMobileProvider] = useState<"mpesa" | "airtel">("mpesa");
+
   const [stkLoading, setStkLoading] = useState(false);
 
   useEffect(() => {
@@ -66,32 +65,42 @@ export default function DashboardPage() {
   };
 
   const handleMobileMoneyCharge = async () => {
-    if (!selectedOrder || !validatePhone(phone)) {
-      toast.error("Enter a valid Kenyan phone number (e.g., 0712345678)");
-      return;
-    }
+    if (!selectedOrder) return;
 
     setStkLoading(true);
     try {
-      const res = await fetch("/api/paystack/charge", {
+      const payRes = await fetch("/api/paystack/initialize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          orderId: selectedOrder.id,
-          phone,
-          provider: mobileProvider,
-        }),
+        body: JSON.stringify({ orderId: selectedOrder.id }),
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      const payData = await payRes.json();
+      if (!payRes.ok) throw new Error(payData.error || "Payment initialization failed");
 
-      toast.success(`Payment request sent via ${data.provider === "mpesa" ? "M-Pesa" : "Airtel Money"}`);
-      setStkModal(false);
-      setPhone("");
-      fetchOrders();
+      const PaystackPop = (await import("@paystack/inline-js")).default;
+      const popup = new PaystackPop();
+
+      popup.resumeTransaction(payData.accessCode, {
+        onSuccess: async () => {
+          await fetch("/api/paystack/verify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ reference: payData.reference }),
+          }).catch(() => {});
+          setStkModal(false);
+          toast.success("Payment successful!");
+          fetchOrders();
+        },
+        onCancel: () => {
+          toast.error("Payment was cancelled");
+        },
+        onError: () => {
+          toast.error("Payment could not be completed");
+        },
+      });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Payment request failed");
+      toast.error(err instanceof Error ? err.message : "Payment failed");
     } finally {
       setStkLoading(false);
     }
@@ -236,11 +245,11 @@ export default function DashboardPage() {
       <Modal
         open={stkModal}
         onClose={() => setStkModal(false)}
-        title="Mobile Money Payment"
+        title="Process Payment"
       >
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            Send payment request to customer&apos;s phone
+            Open payment popup for this order
           </p>
           {selectedOrder && (
             <div className="rounded-lg bg-secondary p-3">
@@ -252,43 +261,13 @@ export default function DashboardPage() {
               </p>
             </div>
           )}
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              onClick={() => setMobileProvider("mpesa")}
-              className={`flex items-center justify-center gap-2 p-3 rounded-lg border text-sm font-medium transition-colors ${
-                mobileProvider === "mpesa"
-                  ? "bg-green-600 text-white border-green-600"
-                  : "bg-background hover:bg-secondary border-input"
-              }`}
-            >
-              <Smartphone className="h-4 w-4" />
-              M-Pesa
-            </button>
-            <button
-              onClick={() => setMobileProvider("airtel")}
-              className={`flex items-center justify-center gap-2 p-3 rounded-lg border text-sm font-medium transition-colors ${
-                mobileProvider === "airtel"
-                  ? "bg-blue-600 text-white border-blue-600"
-                  : "bg-background hover:bg-secondary border-input"
-              }`}
-            >
-              <Smartphone className="h-4 w-4" />
-              Airtel Money
-            </button>
-          </div>
-          <Input
-            label="Customer Phone Number"
-            placeholder="0712 345 678"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-          />
           <Button
             className="w-full"
             onClick={handleMobileMoneyCharge}
             loading={stkLoading}
           >
             <Smartphone className="mr-2 h-4 w-4" />
-            Send {mobileProvider === "mpesa" ? "M-Pesa" : "Airtel Money"} Request
+            Open Payment Popup
           </Button>
         </div>
       </Modal>

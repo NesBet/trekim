@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
-import { formatCurrency, validatePhone } from "@/lib/utils";
+import { formatCurrency } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
 import {
   ShoppingCart,
@@ -23,7 +23,6 @@ import {
   XCircle,
   Loader2,
   RotateCcw,
-  RefreshCw,
   Signal,
 } from "lucide-react";
 import toast from "react-hot-toast";
@@ -46,27 +45,24 @@ interface CartItem {
   quantity: number;
 }
 
-type MobileMoneyState = "idle" | "waiting" | "success" | "failed";
 type PaymentOption = "CASH" | "MPESA" | "AIRTEL";
 
 function ConfettiOverlay() {
-  const particles = useRef(
-    Array.from({ length: 50 }, (_, i) => ({
-      id: i,
-      left: Math.random() * 100,
-      delay: Math.random() * 2,
-      duration: 2 + Math.random() * 3,
-      color: ["#eab308", "#22c55e", "#3b82f6", "#ec4899", "#a855f7"][
-        Math.floor(Math.random() * 5)
-      ],
-      rotation: Math.random() * 360,
-      size: 6 + Math.random() * 8,
-    }))
-  );
+  const particles = Array.from({ length: 50 }, (_, i) => ({
+    id: i,
+    left: Math.random() * 100,
+    delay: Math.random() * 2,
+    duration: 2 + Math.random() * 3,
+    color: ["#eab308", "#22c55e", "#3b82f6", "#ec4899", "#a855f7"][
+      Math.floor(Math.random() * 5)
+    ],
+    rotation: Math.random() * 360,
+    size: 6 + Math.random() * 8,
+  }));
 
   return (
     <div className="fixed inset-0 pointer-events-none z-[100] overflow-hidden">
-      {particles.current.map((p) => (
+      {particles.map((p) => (
         <div
           key={p.id}
           className="absolute top-0 animate-confetti"
@@ -86,39 +82,6 @@ function ConfettiOverlay() {
   );
 }
 
-function MobileMoneyWaitingOverlay({ provider, onCancel }: { provider: string; onCancel: () => void }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="bg-background rounded-2xl p-10 max-w-sm w-full mx-4 text-center space-y-6 animate-fade-in shadow-2xl border">
-        <div className="relative mx-auto w-24 h-24">
-          <div className="absolute inset-0 rounded-full border-4 border-muted" />
-          <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-trekim-500 animate-spin" />
-          <Smartphone className="absolute inset-0 m-auto h-10 w-10 text-trekim-500 animate-pulse" />
-        </div>
-        <div className="space-y-2">
-          <h3 className="text-xl font-bold">Waiting for Payment</h3>
-          <p className="text-sm text-muted-foreground">
-            {provider === "mpesa"
-              ? "STK push sent to your M-Pesa phone. Enter your PIN to confirm."
-              : "Payment request sent to your Airtel Money phone. Check your phone to complete."}
-          </p>
-        </div>
-        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-secondary text-xs font-medium">
-          <Signal className="h-3 w-3" />
-          {provider === "mpesa" ? "M-Pesa" : "Airtel Money"}
-        </div>
-        <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-          <RefreshCw className="h-4 w-4 animate-spin" />
-          <span>Awaiting confirmation...</span>
-        </div>
-        <Button variant="ghost" size="sm" onClick={onCancel} className="text-muted-foreground">
-          Cancel
-        </Button>
-      </div>
-    </div>
-  );
-}
-
 export default function POSPage() {
   const { user } = useAuth();
   const router = useRouter();
@@ -131,7 +94,6 @@ export default function POSPage() {
   const [customerPhone, setCustomerPhone] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentOption | null>(null);
   const [cashAmount, setCashAmount] = useState("");
-  const [mobilePhone, setMobilePhone] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [resultModal, setResultModal] = useState(false);
   const [resultData, setResultData] = useState<{
@@ -140,18 +102,11 @@ export default function POSPage() {
     total: number;
   } | null>(null);
 
-  const [mmState, setMmState] = useState<MobileMoneyState>("idle");
-  const [mmOrderId, setMmOrderId] = useState<string | null>(null);
-  const [mmRef, setMmRef] = useState<string | null>(null);
-  const [mmError, setMmError] = useState("");
-  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const pollingCountRef = useRef(0);
+  const [popupState, setPopupState] = useState<"idle" | "success" | "failed">("idle");
+  const [popupError, setPopupError] = useState("");
 
   useEffect(() => {
     fetchProducts();
-    return () => {
-      if (pollingRef.current) clearInterval(pollingRef.current);
-    };
   }, []);
 
   const fetchProducts = async () => {
@@ -227,66 +182,13 @@ export default function POSPage() {
     return matchesSearch && matchesCategory;
   });
 
-  const stopPolling = useCallback(() => {
-    if (pollingRef.current) {
-      clearInterval(pollingRef.current);
-      pollingRef.current = null;
-    }
-    pollingCountRef.current = 0;
-  }, []);
-
-  const startPolling = useCallback(
-    (ref: string) => {
-      pollingCountRef.current = 0;
-      if (pollingRef.current) clearInterval(pollingRef.current);
-
-      pollingRef.current = setInterval(async () => {
-        pollingCountRef.current++;
-
-        if (pollingCountRef.current > 60) {
-          stopPolling();
-          setMmState("failed");
-          setMmError("Payment confirmation timed out. Please try again.");
-          return;
-        }
-
-        try {
-          const res = await fetch("/api/paystack/charge-status", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ reference: ref }),
-          });
-          if (!res.ok) return;
-          const data = await res.json();
-
-          if (data.paid) {
-            stopPolling();
-            setMmState("success");
-          } else if (data.status === "FAILED") {
-            stopPolling();
-            setMmState("failed");
-            setMmError("Payment was declined or failed.");
-          }
-        } catch {
-          // continue polling
-        }
-      }, 2000);
-    },
-    [stopPolling]
-  );
-
   const handleMobileMoneySubmit = async () => {
-    if (!validatePhone(mobilePhone)) {
-      toast.error("Enter a valid Kenyan phone number (e.g., 0712345678)");
-      return;
-    }
     if (!customerPhone) {
-      setCustomerPhone(mobilePhone);
+      toast.error("Enter customer phone number");
+      return;
     }
 
     setSubmitting(true);
-    setMmState("waiting");
-    setMmError("");
 
     try {
       const res = await fetch("/api/orders", {
@@ -299,7 +201,7 @@ export default function POSPage() {
           })),
           paymentMethod: "MPESA",
           customerName: customerName.trim(),
-          customerPhone: customerPhone.trim() || mobilePhone,
+          customerPhone: customerPhone.trim(),
           deliveryLocation: "Walk-in",
         }),
       });
@@ -307,31 +209,43 @@ export default function POSPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
 
-      const orderId = data.order.id;
-
-      const chargeRes = await fetch("/api/paystack/charge", {
+      const payRes = await fetch("/api/paystack/initialize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          orderId,
-          phone: mobilePhone,
-          provider: paymentMethod === "MPESA" ? "mpesa" : "airtel",
-        }),
+        body: JSON.stringify({ orderId: data.order.id }),
       });
 
-      if (!chargeRes.ok) {
-        const chargeErr = await chargeRes.json();
-        throw new Error(chargeErr.error || "Mobile money charge failed");
-      }
+      const payData = await payRes.json();
+      if (!payRes.ok) throw new Error(payData.error || "Payment initialization failed");
 
-      const chargeData = await chargeRes.json();
-      setMmOrderId(orderId);
-      setMmRef(chargeData.reference);
+      const PaystackPop = (await import("@paystack/inline-js")).default;
+      const popup = new PaystackPop();
 
-      startPolling(chargeData.reference);
+      popup.resumeTransaction(payData.accessCode, {
+        onSuccess: async () => {
+          await fetch("/api/paystack/verify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ reference: payData.reference }),
+          }).catch(() => {});
+          setItems([]);
+          setCustomerName("");
+          setCustomerPhone("");
+          setPaymentMethod(null);
+          setPopupState("success");
+        },
+        onCancel: () => {
+          setPopupState("failed");
+          setPopupError("Payment was cancelled");
+        },
+        onError: () => {
+          setPopupState("failed");
+          setPopupError("Payment could not be completed");
+        },
+      });
     } catch (err) {
-      setMmState("failed");
-      setMmError(err instanceof Error ? err.message : "Failed to process payment");
+      setPopupState("failed");
+      setPopupError(err instanceof Error ? err.message : "Failed to process payment");
     } finally {
       setSubmitting(false);
     }
@@ -405,16 +319,16 @@ export default function POSPage() {
   };
 
   const handleRetry = () => {
-    setMmState("idle");
-    setMmError("");
-    setMmOrderId(null);
-    setMmRef(null);
+    setPopupState("idle");
+    setPopupError("");
   };
 
-  const handleCancelWaiting = () => {
-    stopPolling();
-    setMmState("failed");
-    setMmError("Payment cancelled.");
+  const refreshPage = () => {
+    setPopupState("idle");
+    setItems([]);
+    setCustomerName("");
+    setCustomerPhone("");
+    setPaymentMethod(null);
   };
 
   return (
@@ -647,23 +561,12 @@ export default function POSPage() {
                 </div>
               )}
 
-              {(paymentMethod === "MPESA" || paymentMethod === "AIRTEL") && (
-                <div className="space-y-2">
-                  <Input
-                    label={`Phone Number (${paymentMethod === "MPESA" ? "M-Pesa" : "Airtel Money"})`}
-                    placeholder="0712 345 678"
-                    value={mobilePhone}
-                    onChange={(e) => setMobilePhone(e.target.value)}
-                  />
-                </div>
-              )}
-
               <Button
                 className="w-full"
                 size="lg"
                 onClick={handleSubmit}
                 loading={submitting}
-                disabled={items.length === 0 || !paymentMethod || mmState === "waiting"}
+                disabled={items.length === 0 || !paymentMethod}
               >
                 {paymentMethod === "CASH" ? (
                   <>
@@ -689,16 +592,8 @@ export default function POSPage() {
         </div>
       </div>
 
-      {/* Mobile Money Waiting Overlay */}
-      {mmState === "waiting" && (
-        <MobileMoneyWaitingOverlay
-          provider={paymentMethod === "MPESA" ? "mpesa" : "airtel"}
-          onCancel={handleCancelWaiting}
-        />
-      )}
-
-      {/* Mobile Money Success Overlay */}
-      {mmState === "success" && (
+      {/* Popup Success Overlay */}
+      {popupState === "success" && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <ConfettiOverlay />
           <div className="bg-background rounded-2xl p-10 max-w-sm w-full mx-4 text-center space-y-6 animate-fade-in shadow-2xl border relative z-10">
@@ -708,7 +603,7 @@ export default function POSPage() {
             <div className="space-y-1">
               <h3 className="text-2xl font-bold text-green-600 dark:text-green-400">Payment Successful!</h3>
               <p className="text-sm text-muted-foreground">
-                Mobile money payment confirmed.
+                Payment confirmed for this order.
               </p>
             </div>
             <div className="rounded-lg bg-secondary/50 p-4 space-y-1">
@@ -716,19 +611,7 @@ export default function POSPage() {
               <p className="text-xs text-muted-foreground">Total Amount</p>
             </div>
             <div className="flex gap-3 pt-2">
-              <Button
-                className="flex-1"
-                onClick={() => {
-                  setMmState("idle");
-                  setItems([]);
-                  setCustomerName("");
-                  setCustomerPhone("");
-                  setMobilePhone("");
-                  setPaymentMethod(null);
-                  setMmOrderId(null);
-                  setMmRef(null);
-                }}
-              >
+              <Button className="flex-1" onClick={refreshPage}>
                 New Order
               </Button>
               <Button variant="outline" className="flex-1" onClick={() => router.push("/dashboard")}>
@@ -740,8 +623,8 @@ export default function POSPage() {
         </div>
       )}
 
-      {/* Mobile Money Failed Overlay */}
-      {mmState === "failed" && (
+      {/* Popup Failed Overlay */}
+      {popupState === "failed" && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="bg-background rounded-2xl p-10 max-w-sm w-full mx-4 text-center space-y-6 animate-fade-in shadow-2xl border">
             <div className="mx-auto w-20 h-20 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
@@ -749,20 +632,14 @@ export default function POSPage() {
             </div>
             <div className="space-y-1">
               <h3 className="text-2xl font-bold text-red-600 dark:text-red-400">Payment Failed</h3>
-              <p className="text-sm text-muted-foreground">{mmError || "Something went wrong."}</p>
-            </div>
-            <div className="rounded-lg bg-secondary/50 p-4 space-y-1">
-              <p className="text-lg font-semibold">{formatCurrency(total)}</p>
-              <p className="text-xs text-muted-foreground">Amount</p>
-              <p className="text-sm font-medium">{mobilePhone}</p>
-              <p className="text-xs text-muted-foreground">Phone Number</p>
+              <p className="text-sm text-muted-foreground">{popupError || "Something went wrong."}</p>
             </div>
             <div className="flex gap-3 pt-2">
               <Button className="flex-1" onClick={handleRetry}>
                 <RotateCcw className="mr-2 h-4 w-4" />
                 Try Again
               </Button>
-              <Button variant="ghost" className="flex-1" onClick={() => setMmState("idle")}>
+              <Button variant="ghost" className="flex-1" onClick={() => setPopupState("idle")}>
                 Cancel
               </Button>
             </div>

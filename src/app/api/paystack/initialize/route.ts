@@ -63,10 +63,12 @@ export async function POST(request: Request) {
       where: { id: session.userId },
     });
 
+    const reference = `TREKIM-${order.id}-${Date.now()}`;
+
     const result = await initializeTransaction({
       email: user?.email || "customer@trekim.co.ke",
       amount: order.total,
-      reference: `CARD-${order.id}-${Date.now()}`,
+      reference,
       metadata: {
         orderId: order.id,
         orderNumber: order.orderNumber,
@@ -92,6 +94,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       authorizationUrl: result.data.authorization_url,
+      accessCode: result.data.access_code,
       reference: result.data.reference,
     });
   } catch (error) {

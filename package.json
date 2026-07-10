@@ -15,6 +15,7 @@
     "postinstall": "prisma generate"
   },
   "dependencies": {
+    "@paystack/inline-js": "^2.23.1",
     "@prisma/client": "^6.7.0",
     "@vercel/analytics": "^2.0.1",
     "bcryptjs": "^3.0.3",

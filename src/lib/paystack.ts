@@ -12,6 +12,7 @@ interface InitializeTransactionData {
   authorization_url: string;
   access_code: string;
   reference: string;
+  domain: string;
 }
 
 interface TransactionData {
@@ -115,8 +116,8 @@ export async function initializeTransaction(params: {
       amount: amountInKobo,
       reference: params.reference,
       metadata: params.metadata,
-      channels: ["card"],
-      callback_url: `${BASE_URL}/orders`,
+      channels: ["card", "mobile_money", "bank", "ussd", "qr"],
+      callback_url: `${BASE_URL}/payment/callback`,
     }),
   });
 }
