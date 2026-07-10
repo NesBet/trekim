@@ -15,6 +15,7 @@ import {
   Check,
   CreditCard,
   ExternalLink,
+  Trash2,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -127,6 +128,7 @@ export default function OrdersPage() {
   const [search, setSearch] = useState("");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [paying, setPaying] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (!authLoading && user) {
@@ -210,6 +212,26 @@ export default function OrdersPage() {
       toast.error(err instanceof Error ? err.message : "Payment failed");
     } finally {
       setPaying(false);
+    }
+  };
+
+  const handleDeleteOrder = async (order: Order) => {
+    if (!confirm(`Delete order ${order.orderNumber}? This cannot be undone.`)) return;
+
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/orders/${order.id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to delete");
+      toast.success("Order deleted");
+      setSelectedOrder(null);
+      fetchOrders();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to delete order");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -473,15 +495,25 @@ export default function OrdersPage() {
             )}
 
             {isUnpaid(selectedOrder) && (
-              <Button
-                className="w-full"
-                size="lg"
-                onClick={() => handlePayNow(selectedOrder)}
-                loading={paying}
-              >
-                <CreditCard className="mr-2 h-5 w-5" />
-                Pay Now — {formatCurrency(selectedOrder.total)}
-              </Button>
+              <div className="flex gap-3">
+                <Button
+                  className="flex-1"
+                  size="lg"
+                  onClick={() => handlePayNow(selectedOrder)}
+                  loading={paying}
+                >
+                  <CreditCard className="mr-2 h-5 w-5" />
+                  Pay Now — {formatCurrency(selectedOrder.total)}
+                </Button>
+                <Button
+                  variant="danger"
+                  size="lg"
+                  onClick={() => handleDeleteOrder(selectedOrder)}
+                  loading={deleting}
+                >
+                  <Trash2 className="h-5 w-5" />
+                </Button>
+              </div>
             )}
           </div>
         )}

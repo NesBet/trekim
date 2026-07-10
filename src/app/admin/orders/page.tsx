@@ -33,6 +33,7 @@ interface Order {
   status: string;
   total: number;
   createdAt: string;
+  deletedAt: string | null;
   customer: { name: string; email: string; phone: string | null } | null;
   salesperson: { name: string; email: string } | null;
   items: {
@@ -510,9 +511,16 @@ export default function AdminOrdersPage() {
             </TableHeader>
             <TableBody>
               {filteredOrders.map((order) => (
-                <TableRow key={order.id}>
+                <TableRow key={order.id} className={order.deletedAt ? "opacity-60" : ""}>
                   <TableCell className="font-medium">
-                    {order.orderNumber}
+                    <div className="flex items-center gap-2">
+                      {order.orderNumber}
+                      {order.deletedAt && (
+                        <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300">
+                          Deleted
+                        </span>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>
                     {order.customer?.name || "Walk-in"}

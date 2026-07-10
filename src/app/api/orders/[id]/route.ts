@@ -29,8 +29,13 @@ export async function GET(
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
 
-    if (session.role === "CUSTOMER" && order.customerId !== session.userId) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    if (session.role === "CUSTOMER") {
+      if (order.customerId !== session.userId) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+      if (order.deletedAt) {
+        return NextResponse.json({ error: "Order not found" }, { status: 404 });
+      }
     }
 
     if (
@@ -45,6 +50,64 @@ export async function GET(
     console.error("Fetch order error:", error);
     return NextResponse.json(
       { error: "Failed to fetch order" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const session = await getSession();
+    if (!session || session.role !== "CUSTOMER") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const order = await prisma.order.findUnique({
+      where: { id },
+      include: { payment: true },
+    });
+
+    if (!order) {
+      return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    }
+
+    if (order.customerId !== session.userId) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    if (order.deletedAt) {
+      return NextResponse.json({ error: "Order already deleted" }, { status: 400 });
+    }
+
+    if (order.payment?.status === "SUCCESS") {
+      return NextResponse.json(
+        { error: "Cannot delete a paid order" },
+        { status: 400 }
+      );
+    }
+
+    await prisma.order.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        userId: session.userId,
+        action: "DELETE_ORDER",
+        details: `Customer deleted order ${order.orderNumber}`,
+      },
+    });
+
+    return NextResponse.json({ message: "Order deleted" });
+  } catch (error) {
+    console.error("Delete order error:", error);
+    return NextResponse.json(
+      { error: "Failed to delete order" },
       { status: 500 }
     );
   }

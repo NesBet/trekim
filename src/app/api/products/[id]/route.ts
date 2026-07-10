@@ -94,9 +94,31 @@ export async function DELETE(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const product = await prisma.product.delete({
+    const product = await prisma.product.findUnique({
       where: { id },
+      include: { orderItems: true },
     });
+
+    if (!product) {
+      return NextResponse.json(
+        { error: "Product not found" },
+        { status: 404 }
+      );
+    }
+
+    if (product.orderItems.length > 0) {
+      return NextResponse.json(
+        {
+          error:
+            "Cannot delete a product with existing orders. Set it as unavailable instead.",
+        },
+        { status: 409 }
+      );
+    }
+
+    await prisma.cartItem.deleteMany({ where: { productId: id } });
+
+    await prisma.product.delete({ where: { id } });
 
     await prisma.auditLog.create({
       data: {

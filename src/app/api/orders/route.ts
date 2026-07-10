@@ -20,8 +20,10 @@ export async function GET(request: Request) {
 
     if (session.role === "CUSTOMER") {
       where.customerId = session.userId;
+      where.deletedAt = null;
     } else if (session.role === "SALESPERSON") {
       where.salespersonId = session.userId;
+      where.deletedAt = null;
     }
 
     if (status) {

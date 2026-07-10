@@ -81,6 +81,7 @@ model Order {
   status           OrderStatus @default(PENDING)
   total            Float
   deliveryLocation String?
+  deletedAt        DateTime?
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
 
