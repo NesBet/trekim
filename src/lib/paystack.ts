@@ -73,6 +73,7 @@ export async function chargeMobileMoney(params: {
 }) {
   const amountInKobo = String(Math.round(params.amount * 100));
   const cleanedPhone = params.phone.replace(/[^0-9]/g, "");
+  const providerMap: Record<string, string> = { mpesa: "MPESA", airtel: "AIRTEL" };
 
   const body: Record<string, unknown> = {
     email: params.email,
@@ -84,7 +85,7 @@ export async function chargeMobileMoney(params: {
 
   body.mobile_money = {
     phone: cleanedPhone,
-    provider: params.provider,
+    provider: providerMap[params.provider],
   };
 
   return paystackFetch<ChargeData>("/charge", {
