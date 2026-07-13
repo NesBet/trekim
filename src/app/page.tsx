@@ -51,7 +51,7 @@ export default function HomePage() {
               <GlassWater className="h-16 w-16 text-trekim-500" />
             </div>
             <h1 className="text-4xl md:text-6xl font-bold tracking-tight mb-6">
-              Welcome to <span className="text-trekim-500">K.W Social</span> Tavern
+              Welcome to <span className="text-trekim-500">K.W</span>Social
             </h1>
             <p className="text-lg md:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
               Kiserian&apos;s premier destination for premium drinks, great
