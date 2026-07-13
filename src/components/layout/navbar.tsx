@@ -88,7 +88,7 @@ export function Navbar() {
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         <Link href="/" className="flex items-center gap-2 font-bold text-xl">
           <GlassWater className="h-6 w-6 text-trekim-500" />
-          <span className="text-trekim-500">Trekim</span>
+          <span className="text-trekim-500">K.W Social</span>
         </Link>
 
         {!isAuthPage && (

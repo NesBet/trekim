@@ -8,7 +8,7 @@ export function Footer() {
           <div>
             <div className="flex items-center gap-2 font-bold text-lg mb-3">
               <GlassWater className="h-5 w-5 text-trekim-500" />
-              <span className="text-trekim-500">Trekim</span>
+              <span className="text-trekim-500">K.W Social</span>
             </div>
             <p className="text-sm text-muted-foreground">
               Premium drinks, great atmosphere, unforgettable moments.
@@ -24,11 +24,11 @@ export function Footer() {
               </div>
               <div className="flex items-center gap-2">
                 <Phone className="h-4 w-4" />
-                <span>+254 795 280 737</span>
+                <span>+254 780 237 794</span>
               </div>
               <div className="flex items-center gap-2">
                 <Mail className="h-4 w-4" />
-                <span>contact@trekim.com</span>
+                <span>contact@wanset.com</span>
               </div>
             </div>
           </div>
@@ -45,7 +45,7 @@ export function Footer() {
 
         <div className="border-t mt-8 pt-6 text-center text-sm text-muted-foreground">
           <p>
-            &copy; {new Date().getFullYear()} Trekim Tavern. All rights
+            &copy; {new Date().getFullYear()} K.W Social. All rights
             reserved.
           </p>
         </div>

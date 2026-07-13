@@ -30,7 +30,7 @@ const features = [
     icon: Clock,
     title: "Great Atmosphere",
     description:
-      "Whether it's after-work drinks or weekend celebrations, Trekim offers the perfect ambiance.",
+      "Whether it's after-work drinks or weekend celebrations, K.W Social offers the perfect ambiance.",
   },
 ];
 
@@ -51,7 +51,7 @@ export default function HomePage() {
               <GlassWater className="h-16 w-16 text-trekim-500" />
             </div>
             <h1 className="text-4xl md:text-6xl font-bold tracking-tight mb-6">
-              Welcome to <span className="text-trekim-500">Trekim</span> Tavern
+              Welcome to <span className="text-trekim-500">K.W Social</span> Tavern
             </h1>
             <p className="text-lg md:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
               Kiserian&apos;s premier destination for premium drinks, great
@@ -66,7 +66,7 @@ export default function HomePage() {
               </Link>
               <Link href="/signup">
                 <Button size="lg" variant="outline" className="text-base">
-                  Join Trekim Club
+                  Join K.W Club
                 </Button>
               </Link>
             </div>
@@ -76,7 +76,7 @@ export default function HomePage() {
 
       <section className="container mx-auto px-4 py-16">
         <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold mb-3">Why Trekim?</h2>
+          <h2 className="text-3xl font-bold mb-3">Why K.W?</h2>
           <p className="text-muted-foreground max-w-xl mx-auto">
             We pride ourselves on offering an exceptional experience
           </p>

@@ -10,11 +10,11 @@ import { Analytics } from "@vercel/analytics/next";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Trekim Tavern - Premium Drinks in Kiserian",
+  title: "K.W Social - Premium Drinks in Kiserian",
   description:
-    "Trekim Tavern offers premium alcoholic drinks in Kiserian, along Magadi Road, Nairobi. Browse our selection of beers, wines, spirits, and more.",
+    "K.W Social offers premium alcoholic drinks in Kiserian, along Magadi Road, Nairobi. Browse our selection of beers, wines, spirits, and more.",
   keywords:
-    "Trekim, bar, lounge, Kiserian, Magadi Road, Nairobi, drinks, alcohol, Kenya",
+    "K.W Social, bar, lounge, Kiserian, Magadi Road, Nairobi, drinks, alcohol, Kenya",
   icons: [{ rel: "icon", url: "/favicon.png" }],
 };
 

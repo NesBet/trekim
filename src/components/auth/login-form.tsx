@@ -36,7 +36,7 @@ export function LoginForm() {
         <div className="flex justify-center mb-4">
           <GlassWater className="h-12 w-12 text-trekim-500" />
         </div>
-        <CardTitle className="text-2xl">Welcome to Trekim</CardTitle>
+        <CardTitle className="text-2xl">Welcome to K.W</CardTitle>
         <CardDescription>Sign in to your account</CardDescription>
       </CardHeader>
       <CardContent>
