@@ -36,6 +36,7 @@ interface Product {
   image: string | null;
   category: string | null;
   stock: number;
+  available: boolean;
 }
 
 interface CartItem {
@@ -395,11 +396,12 @@ export default function POSPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {filtered.map((product) => {
                 const outOfStock = product.stock === 0;
+                const unavailable = !product.available;
                 return (
                   <Card
                     key={product.id}
                     className={`overflow-hidden transition-all hover:shadow-md ${
-                      outOfStock ? "opacity-50" : ""
+                      outOfStock || unavailable ? "opacity-50" : ""
                     }`}
                   >
                     <CardContent className="p-4 flex items-center gap-4">
@@ -410,8 +412,11 @@ export default function POSPage() {
                         <h3 className="font-semibold truncate">{product.name}</h3>
                         <p className="text-trekim-500 font-bold">{formatCurrency(product.price)}</p>
                         <p className="text-xs text-muted-foreground">Stock: {product.stock}</p>
+                        {unavailable && (
+                          <p className="text-xs text-destructive font-medium mt-0.5">Unavailable</p>
+                        )}
                       </div>
-                      {!outOfStock && (
+                      {!outOfStock && !unavailable && (
                         <Button size="sm" onClick={() => addToCart(product, 1)}>
                           <Plus className="h-4 w-4" />
                         </Button>

@@ -6,9 +6,14 @@ import {
   useState,
   useEffect,
   useCallback,
+  useRef,
   type ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
+
+const INACTIVITY_TIMEOUT = 30 * 60 * 1000;
+const CHECK_INTERVAL = 10 * 1000;
+const THROTTLE_MS = 2_000;
 
 interface User {
   id: string;
@@ -41,6 +46,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [logoutLoading, setLogoutLoading] = useState(false);
   const router = useRouter();
 
+  const lastActivityRef = useRef<number>(Date.now());
+  const throttleRef = useRef<number>(0);
+
+  const recordActivity = useCallback(() => {
+    const now = Date.now();
+    if (now - throttleRef.current >= THROTTLE_MS) {
+      lastActivityRef.current = now;
+      throttleRef.current = now;
+    }
+  }, []);
+
   const fetchUser = useCallback(async () => {
     try {
       const res = await fetch("/api/auth/me", { cache: "no-store" });
@@ -60,6 +76,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     fetchUser();
   }, [fetchUser]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    lastActivityRef.current = Date.now();
+
+    const events = ["mousedown", "keydown", "scroll", "touchstart", "mousemove"];
+    events.forEach((e) => window.addEventListener(e, recordActivity));
+
+    const id = setInterval(async () => {
+      if (Date.now() - lastActivityRef.current >= INACTIVITY_TIMEOUT) {
+        clearInterval(id);
+        events.forEach((e) => window.removeEventListener(e, recordActivity));
+        try {
+          await fetch("/api/auth/logout", { method: "POST" });
+        } catch {}
+        setUser(null);
+        router.push("/login");
+      }
+    }, CHECK_INTERVAL);
+
+    return () => {
+      clearInterval(id);
+      events.forEach((e) => window.removeEventListener(e, recordActivity));
+    };
+  }, [user, router, recordActivity]);
 
   const login = async (
     email: string,

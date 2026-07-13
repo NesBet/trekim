@@ -6,8 +6,11 @@ import { z } from "zod";
 
 export async function GET() {
   try {
+    const session = await getSession();
+    const isStaff = session && ["ADMIN", "SALESPERSON"].includes(session.role);
+
     const products = await prisma.product.findMany({
-      where: { available: true },
+      where: isStaff ? {} : { available: true },
       orderBy: { name: "asc" },
     });
     return NextResponse.json({ products });
