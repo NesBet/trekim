@@ -41,7 +41,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
 
-    if (order.customerId !== session.userId && session.role !== "ADMIN") {
+    if (
+      order.customerId !== session.userId &&
+      order.salespersonId !== session.userId &&
+      session.role !== "ADMIN"
+    ) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
