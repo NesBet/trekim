@@ -1,7 +1,28 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
-import { generateOrderNumber } from "@/lib/utils";
+import { generateOrderNumber, sanitizeInput } from "@/lib/utils";
+import { z } from "zod";
+
+const orderItemSchema = z.object({
+  productId: z.string().min(1),
+  quantity: z.number().int().positive(),
+});
+
+const createOrderSchema = z.object({
+  items: z.array(orderItemSchema).min(1),
+  customerId: z.string().optional(),
+  deliveryLocation: z.string().max(500).transform(sanitizeInput).optional(),
+  paymentMethod: z.enum(["CASH", "MPESA"]).optional(),
+  customerName: z.string().max(100).transform(sanitizeInput).optional(),
+  customerPhone: z
+    .string()
+    .max(20)
+    .optional()
+    .nullable()
+    .transform((v) => (v ? v.replace(/[^0-9+]/g, "") : v)),
+  cashAmount: z.number().min(0).optional(),
+});
 
 export async function GET(request: Request) {
   try {
@@ -70,12 +91,20 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const text = await request.text();
+    if (text.length > 100_000) {
+      return NextResponse.json({ error: "Request too large" }, { status: 413 });
     }
 
-    const body = await request.json();
+    const body = JSON.parse(text);
+
+    const parsed = createOrderSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.errors.map((e) => e.message).join(", ") },
+        { status: 400 }
+      );
+    }
 
     const {
       items,
@@ -85,41 +114,51 @@ export async function POST(request: Request) {
       customerName,
       customerPhone,
       cashAmount,
-    } = body;
+    } = parsed.data;
 
-    if (!items || !Array.isArray(items) || items.length === 0) {
-      return NextResponse.json(
-        { error: "Order must contain at least one item" },
-        { status: 400 }
-      );
+    const session = await getSession();
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const productIds = items.map((i: { productId: string }) => i.productId);
+    const productIds = items.map((i) => i.productId);
     const products = await prisma.product.findMany({
       where: { id: { in: productIds } },
     });
 
+    if (products.length !== items.length) {
+      return NextResponse.json(
+        { error: "One or more products not found" },
+        { status: 400 }
+      );
+    }
+
     const productMap = new Map(products.map((p) => [p.id, p]));
 
     let total = 0;
-    const orderItems = items.map(
-      (item: { productId: string; quantity: number }) => {
-        const product = productMap.get(item.productId);
-        if (!product) {
-          throw new Error(`Product ${item.productId} not found`);
-        }
-        if (product.stock < item.quantity) {
-          throw new Error(`Insufficient stock for ${product.name}`);
-        }
-        const price = product.price;
-        total += price * item.quantity;
-        return {
-          productId: item.productId,
-          quantity: item.quantity,
-          price,
-        };
+    const orderItems: { productId: string; quantity: number; price: number }[] = [];
+
+    for (const item of items) {
+      const product = productMap.get(item.productId);
+      if (!product) {
+        return NextResponse.json(
+          { error: "One or more products not found" },
+          { status: 400 }
+        );
       }
-    );
+      if (product.stock < item.quantity) {
+        return NextResponse.json(
+          { error: "Insufficient stock for one or more items" },
+          { status: 400 }
+        );
+      }
+      total += product.price * item.quantity;
+      orderItems.push({
+        productId: item.productId,
+        quantity: item.quantity,
+        price: product.price,
+      });
+    }
 
     const orderNumber = generateOrderNumber();
 
@@ -218,8 +257,7 @@ export async function POST(request: Request) {
       { status: 201 }
     );
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to create order";
-    return NextResponse.json({ error: message }, { status: 400 });
+    console.error("Create order error:", error);
+    return NextResponse.json({ error: "Failed to create order" }, { status: 400 });
   }
 }

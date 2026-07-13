@@ -59,7 +59,7 @@ export async function setSession(payload: Omit<TokenPayload, "iat" | "exp">) {
   cookieStore.set(TOKEN_NAME, token, {
     httpOnly: true,
     secure: isSecure,
-    sameSite: "lax",
+    sameSite: "strict",
     maxAge: 7 * 24 * 60 * 60,
     path: "/",
   });
@@ -74,7 +74,7 @@ export async function clearSession() {
   cookieStore.set(TOKEN_NAME, "", {
     httpOnly: true,
     secure: isSecure,
-    sameSite: "lax",
+    sameSite: "strict",
     maxAge: 0,
     path: "/",
   });

@@ -4,7 +4,8 @@ import bcrypt from "bcryptjs";
 const prisma = new PrismaClient();
 
 async function main() {
-  const Password = process.env.ADMIN_PASSWORD || "Admin123";
+  const Password = process.env.ADMIN_PASSWORD;
+  if (!Password) throw new Error("ADMIN_PASSWORD environment variable is required");
   const hashedPassword = await bcrypt.hash(Password, 12);
 
   const admin = await prisma.user.upsert({
@@ -183,7 +184,6 @@ async function main() {
   console.log("Admin email: admin@trekim.co.ke");
   console.log("Salesperson email: sales@trekim.co.ke");
   console.log("Customer email: customer@trekim.com");
-  console.log("Password for all: admin123");
 }
 
 main()

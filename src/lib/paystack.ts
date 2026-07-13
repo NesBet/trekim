@@ -1,3 +1,5 @@
+import crypto from "crypto";
+
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY || "";
 const PAYSTACK_API = "https://api.paystack.co";
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
@@ -157,10 +159,20 @@ export function verifyWebhookSignature(
   payload: string,
   signature: string
 ): boolean {
-  const crypto = require("crypto");
+  if (!PAYSTACK_SECRET) {
+    console.error("PAYSTACK_SECRET_KEY is not configured");
+    return false;
+  }
   const hash = crypto
     .createHmac("sha512", PAYSTACK_SECRET)
     .update(payload)
     .digest("hex");
-  return hash === signature;
+  try {
+    const hashBuf = Buffer.from(hash, "hex");
+    const sigBuf = Buffer.from(signature, "hex");
+    if (hashBuf.length !== sigBuf.length) return false;
+    return crypto.timingSafeEqual(hashBuf, sigBuf);
+  } catch {
+    return false;
+  }
 }

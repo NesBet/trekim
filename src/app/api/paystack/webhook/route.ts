@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { mapPaystackChannel } from "@/lib/paystack";
+import { mapPaystackChannel, verifyWebhookSignature } from "@/lib/paystack";
 
 export async function POST(request: Request) {
   try {
@@ -11,13 +11,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing signature" }, { status: 400 });
     }
 
-    const crypto = require("crypto");
-    const hash = crypto
-      .createHmac("sha512", process.env.PAYSTACK_SECRET_KEY || "")
-      .update(body)
-      .digest("hex");
-
-    if (hash !== signature) {
+    if (!verifyWebhookSignature(body, signature)) {
       return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
     }
 
@@ -104,6 +98,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ received: true });
   } catch (error) {
     console.error("Webhook error:", error);
-    return NextResponse.json({ received: true });
+    return NextResponse.json({ error: "Processing error" }, { status: 500 });
   }
 }

@@ -40,6 +40,7 @@ export async function GET(
 
     if (
       session.role === "SALESPERSON" &&
+      order.salespersonId &&
       order.salespersonId !== session.userId
     ) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });

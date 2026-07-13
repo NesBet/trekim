@@ -1,9 +1,27 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getSession } from "@/lib/auth";
 import { verifyTransaction, checkChargeStatus, mapPaystackChannel } from "@/lib/paystack";
+import { rateLimit, getClientIp } from "@/lib/rate-limit";
+
+const limiter = rateLimit({ interval: 60000, maxRequests: 30 });
 
 export async function POST(request: Request) {
   try {
+    const session = await getSession();
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const ip = getClientIp(request);
+    const { allowed } = await limiter(ip);
+    if (!allowed) {
+      return NextResponse.json(
+        { error: "Too many requests. Try again later." },
+        { status: 429 }
+      );
+    }
+
     const body = await request.json();
     const { reference } = body;
 
