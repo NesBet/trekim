@@ -13,6 +13,7 @@ import {
   Search,
   Smartphone,
   Banknote,
+  CreditCard,
   Plus,
   Minus,
   User,
@@ -20,10 +21,6 @@ import {
   Package,
   ArrowLeft,
   CheckCircle,
-  XCircle,
-  Loader2,
-  RotateCcw,
-  Signal,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
@@ -46,42 +43,7 @@ interface CartItem {
   quantity: number;
 }
 
-type PaymentOption = "CASH" | "MPESA" | "AIRTEL";
-
-function ConfettiOverlay() {
-  const particles = Array.from({ length: 50 }, (_, i) => ({
-    id: i,
-    left: Math.random() * 100,
-    delay: Math.random() * 2,
-    duration: 2 + Math.random() * 3,
-    color: ["#eab308", "#22c55e", "#3b82f6", "#ec4899", "#a855f7"][
-      Math.floor(Math.random() * 5)
-    ],
-    rotation: Math.random() * 360,
-    size: 6 + Math.random() * 8,
-  }));
-
-  return (
-    <div className="fixed inset-0 pointer-events-none z-[100] overflow-hidden">
-      {particles.map((p) => (
-        <div
-          key={p.id}
-          className="absolute top-0 animate-confetti"
-          style={{
-            left: `${p.left}%`,
-            animationDelay: `${p.delay}s`,
-            animationDuration: `${p.duration}s`,
-            width: `${p.size}px`,
-            height: `${p.size}px`,
-            backgroundColor: p.color,
-            borderRadius: Math.random() > 0.5 ? "50%" : "2px",
-            transform: `rotate(${p.rotation}deg)`,
-          }}
-        />
-      ))}
-    </div>
-  );
-}
+type PaymentOption = "CASH" | "MOBILE";
 
 export default function POSPage() {
   const { user } = useAuth();
@@ -103,8 +65,7 @@ export default function POSPage() {
     total: number;
   } | null>(null);
 
-  const [popupState, setPopupState] = useState<"idle" | "success" | "failed">("idle");
-  const [popupError, setPopupError] = useState("");
+
 
   useEffect(() => {
     fetchProducts();
@@ -183,12 +144,7 @@ export default function POSPage() {
     return matchesSearch && matchesCategory;
   });
 
-  const handleMobileMoneySubmit = async () => {
-    if (!customerPhone) {
-      toast.error("Enter customer phone number");
-      return;
-    }
-
+  const handleCardOrMobileSubmit = async () => {
     setSubmitting(true);
 
     try {
@@ -200,9 +156,8 @@ export default function POSPage() {
             productId: item.productId,
             quantity: item.quantity,
           })),
-          paymentMethod: "MPESA",
           customerName: customerName.trim(),
-          customerPhone: customerPhone.trim(),
+          customerPhone: customerPhone.trim() || null,
           deliveryLocation: "Walk-in",
         }),
       });
@@ -233,21 +188,20 @@ export default function POSPage() {
           setCustomerName("");
           setCustomerPhone("");
           setPaymentMethod(null);
-          setPopupState("success");
+          toast.success("Payment successful!");
+          router.push("/dashboard");
         },
         onCancel: () => {
-          setPopupState("failed");
-          setPopupError("Payment was cancelled");
+          toast.error("Payment was cancelled");
+          setSubmitting(false);
         },
         onError: () => {
-          setPopupState("failed");
-          setPopupError("Payment could not be completed");
+          toast.error("Payment could not be completed");
+          setSubmitting(false);
         },
       });
     } catch (err) {
-      setPopupState("failed");
-      setPopupError(err instanceof Error ? err.message : "Failed to process payment");
-    } finally {
+      toast.error(err instanceof Error ? err.message : "Failed to process payment");
       setSubmitting(false);
     }
   };
@@ -315,21 +269,8 @@ export default function POSPage() {
     if (paymentMethod === "CASH") {
       await handleCashSubmit();
     } else {
-      await handleMobileMoneySubmit();
+      await handleCardOrMobileSubmit();
     }
-  };
-
-  const handleRetry = () => {
-    setPopupState("idle");
-    setPopupError("");
-  };
-
-  const refreshPage = () => {
-    setPopupState("idle");
-    setItems([]);
-    setCustomerName("");
-    setCustomerPhone("");
-    setPaymentMethod(null);
   };
 
   return (
@@ -510,7 +451,7 @@ export default function POSPage() {
           <Card>
             <CardContent className="p-4 space-y-3">
               <h3 className="text-sm font-semibold">Payment Method</h3>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 <button
                   onClick={() => setPaymentMethod("CASH")}
                   className={`flex items-center justify-center gap-1 p-3 rounded-lg border text-xs font-medium transition-colors ${
@@ -523,26 +464,15 @@ export default function POSPage() {
                   Cash
                 </button>
                 <button
-                  onClick={() => setPaymentMethod("MPESA")}
+                  onClick={() => setPaymentMethod("MOBILE")}
                   className={`flex items-center justify-center gap-1 p-3 rounded-lg border text-xs font-medium transition-colors ${
-                    paymentMethod === "MPESA"
+                    paymentMethod === "MOBILE"
                       ? "bg-green-600 text-white border-green-600"
                       : "bg-background hover:bg-secondary border-input"
                   }`}
                 >
                   <Smartphone className="h-4 w-4" />
-                  M-Pesa
-                </button>
-                <button
-                  onClick={() => setPaymentMethod("AIRTEL")}
-                  className={`flex items-center justify-center gap-1 p-3 rounded-lg border text-xs font-medium transition-colors ${
-                    paymentMethod === "AIRTEL"
-                      ? "bg-blue-600 text-white border-blue-600"
-                      : "bg-background hover:bg-secondary border-input"
-                  }`}
-                >
-                  <Smartphone className="h-4 w-4" />
-                  Airtel
+                  Card or Mobile Money
                 </button>
               </div>
 
@@ -578,15 +508,10 @@ export default function POSPage() {
                     <Banknote className="mr-2 h-5 w-5" />
                     Complete Sale
                   </>
-                ) : paymentMethod === "MPESA" ? (
+                ) : paymentMethod === "MOBILE" ? (
                   <>
-                    <Smartphone className="mr-2 h-5 w-5" />
-                    Send M-Pesa Payment
-                  </>
-                ) : paymentMethod === "AIRTEL" ? (
-                  <>
-                    <Smartphone className="mr-2 h-5 w-5" />
-                    Send Airtel Money
+                    <CreditCard className="mr-2 h-5 w-5" />
+                    Pay with Card or Mobile Money
                   </>
                 ) : (
                   "Select Payment Method"
@@ -596,61 +521,6 @@ export default function POSPage() {
           </Card>
         </div>
       </div>
-
-      {/* Popup Success Overlay */}
-      {popupState === "success" && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <ConfettiOverlay />
-          <div className="bg-background rounded-2xl p-10 max-w-sm w-full mx-4 text-center space-y-6 animate-fade-in shadow-2xl border relative z-10">
-            <div className="mx-auto w-20 h-20 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center animate-bounce">
-              <CheckCircle className="h-12 w-12 text-green-600 dark:text-green-400" />
-            </div>
-            <div className="space-y-1">
-              <h3 className="text-2xl font-bold text-green-600 dark:text-green-400">Payment Successful!</h3>
-              <p className="text-sm text-muted-foreground">
-                Payment confirmed for this order.
-              </p>
-            </div>
-            <div className="rounded-lg bg-secondary/50 p-4 space-y-1">
-              <p className="text-2xl font-bold text-trekim-500">{formatCurrency(total)}</p>
-              <p className="text-xs text-muted-foreground">Total Amount</p>
-            </div>
-            <div className="flex gap-3 pt-2">
-              <Button className="flex-1" onClick={refreshPage}>
-                New Order
-              </Button>
-              <Button variant="outline" className="flex-1" onClick={() => router.push("/dashboard")}>
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Dashboard
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Popup Failed Overlay */}
-      {popupState === "failed" && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="bg-background rounded-2xl p-10 max-w-sm w-full mx-4 text-center space-y-6 animate-fade-in shadow-2xl border">
-            <div className="mx-auto w-20 h-20 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
-              <XCircle className="h-12 w-12 text-red-600 dark:text-red-400" />
-            </div>
-            <div className="space-y-1">
-              <h3 className="text-2xl font-bold text-red-600 dark:text-red-400">Payment Failed</h3>
-              <p className="text-sm text-muted-foreground">{popupError || "Something went wrong."}</p>
-            </div>
-            <div className="flex gap-3 pt-2">
-              <Button className="flex-1" onClick={handleRetry}>
-                <RotateCcw className="mr-2 h-4 w-4" />
-                Try Again
-              </Button>
-              <Button variant="ghost" className="flex-1" onClick={() => setPopupState("idle")}>
-                Cancel
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Cash Result Modal */}
       <Modal
