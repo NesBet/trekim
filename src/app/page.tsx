@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { useAuth } from "@/lib/auth-context";
 import {
   GlassWater,
   MapPin,
@@ -42,6 +43,8 @@ const categories = [
 ];
 
 export default function HomePage() {
+  const { user } = useAuth();
+
   return (
     <div>
       <section className="relative overflow-hidden bg-gradient-to-b from-trekim-500/20 via-background to-background">
@@ -51,7 +54,7 @@ export default function HomePage() {
               <GlassWater className="h-16 w-16 text-trekim-500" />
             </div>
             <h1 className="text-4xl md:text-6xl font-bold tracking-tight mb-6">
-              Welcome to <span className="text-trekim-500">K.W</span>Social
+              Welcome to <span className="text-trekim-500">K.W </span>Social
             </h1>
             <p className="text-lg md:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
               Kiserian&apos;s premier destination for premium drinks, great
@@ -64,11 +67,13 @@ export default function HomePage() {
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
               </Link>
-              <Link href="/signup">
-                <Button size="lg" variant="outline" className="text-base">
-                  Join K.W Club
-                </Button>
-              </Link>
+              {!user && (
+                <Link href="/signup">
+                  <Button size="lg" variant="outline" className="text-base">
+                    Join K.W Club
+                  </Button>
+                </Link>
+              )}
             </div>
           </div>
         </div>

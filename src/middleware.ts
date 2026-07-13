@@ -31,11 +31,19 @@ export async function middleware(request: NextRequest) {
       (path) => pathname === path || pathname.startsWith(path + "/")
     );
 
+  const token = request.cookies.get("trekim_token")?.value;
+
+  const authOnlyPaths = ["/signup", "/login"];
+  if (token && authOnlyPaths.some((p) => pathname === p)) {
+    const payload = await verifyToken(token);
+    if (payload) {
+      return NextResponse.redirect(new URL("/", request.url));
+    }
+  }
+
   if (isPublic) {
     return NextResponse.next();
   }
-
-  const token = request.cookies.get("trekim_token")?.value;
 
   if (!token) {
     if (pathname.startsWith("/api/")) {
