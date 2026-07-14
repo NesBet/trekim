@@ -63,8 +63,8 @@ export async function DELETE(
   try {
     const { id } = await params;
     const session = await getSession();
-    if (!session || session.role !== "CUSTOMER") {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const order = await prisma.order.findUnique({
@@ -74,10 +74,6 @@ export async function DELETE(
 
     if (!order) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
-    }
-
-    if (order.customerId !== session.userId) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     if (order.deletedAt) {
@@ -91,6 +87,18 @@ export async function DELETE(
       );
     }
 
+    if (session.role === "CUSTOMER") {
+      if (order.customerId !== session.userId) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+    } else if (session.role === "SALESPERSON") {
+      if (order.salespersonId !== session.userId) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+    } else if (session.role !== "ADMIN") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     await prisma.order.update({
       where: { id },
       data: { deletedAt: new Date() },
@@ -100,7 +108,9 @@ export async function DELETE(
       data: {
         userId: session.userId,
         action: "DELETE_ORDER",
-        details: `Customer deleted order ${order.orderNumber}`,
+        details: `${
+          session.role === "CUSTOMER" ? "Customer" : session.role === "SALESPERSON" ? "Salesperson" : "Admin"
+        } deleted order ${order.orderNumber}`,
       },
     });
 
@@ -153,11 +163,6 @@ export async function PATCH(
       if (order.customerId !== session.userId) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
-    } else if (session.role === "SALESPERSON") {
-      return NextResponse.json(
-        { error: "Only admins can update order status" },
-        { status: 403 }
-      );
     }
 
     if (status === "COMPLETED") {

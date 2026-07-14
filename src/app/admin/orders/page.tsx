@@ -322,6 +322,20 @@ export default function AdminOrdersPage() {
     }
   };
 
+  const deleteOrder = async (orderId: string) => {
+    try {
+      const res = await fetch(`/api/orders/${orderId}`, { method: "DELETE" });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to delete");
+      }
+      toast.success("Order deleted");
+      fetchOrders();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to delete order");
+    }
+  };
+
   const statusColors: Record<string, string> = {
     PENDING: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
     CONFIRMED: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
@@ -616,6 +630,15 @@ export default function AdminOrdersPage() {
                           }
                         >
                           Cancel
+                        </Button>
+                      )}
+                      {order.payment?.status !== "SUCCESS" && (
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          onClick={() => deleteOrder(order.id)}
+                        >
+                          Delete
                         </Button>
                       )}
                     </div>
