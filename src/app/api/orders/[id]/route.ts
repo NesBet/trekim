@@ -29,12 +29,13 @@ export async function GET(
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
 
+    if (order.deletedAt) {
+      return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    }
+
     if (session.role === "CUSTOMER") {
       if (order.customerId !== session.userId) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-      }
-      if (order.deletedAt) {
-        return NextResponse.json({ error: "Order not found" }, { status: 404 });
       }
     }
 
@@ -91,18 +92,25 @@ export async function DELETE(
       if (order.customerId !== session.userId) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
+      await prisma.order.update({
+        where: { id },
+        data: { deletedAt: new Date() },
+      });
     } else if (session.role === "SALESPERSON") {
       if (order.salespersonId !== session.userId) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
-    } else if (session.role !== "ADMIN") {
+      await prisma.order.update({
+        where: { id },
+        data: { deletedAt: new Date() },
+      });
+    } else if (session.role === "ADMIN") {
+      await prisma.order.delete({
+        where: { id },
+      });
+    } else {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
-
-    await prisma.order.update({
-      where: { id },
-      data: { deletedAt: new Date() },
-    });
 
     await prisma.auditLog.create({
       data: {
@@ -154,6 +162,13 @@ export async function PATCH(
 
     if (!order) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    }
+
+    if (order.deletedAt) {
+      return NextResponse.json(
+        { error: "Cannot modify a deleted order" },
+        { status: 400 }
+      );
     }
 
     if (session.role === "CUSTOMER") {
