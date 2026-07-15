@@ -5,6 +5,7 @@ import { verifyToken } from "@/lib/auth-edge";
 const publicPaths = [
   "/api/auth/login",
   "/api/auth/signup",
+  "/api/auth/verify-otp",
   "/api/paystack",
   "/api/products",
   "/login",
