@@ -40,7 +40,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: errors.join(", ") }, { status: 400 });
     }
 
-    const { email } = parsed.data;
+    const { name, email } = parsed.data;
 
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
@@ -50,7 +50,7 @@ export async function POST(request: Request) {
       );
     }
 
-    await sendOtp(email);
+    await sendOtp(email, name);
 
     return NextResponse.json(
       { message: "Verification code sent to your email" },

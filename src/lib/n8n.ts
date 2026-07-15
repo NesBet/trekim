@@ -30,13 +30,13 @@ async function callN8nWebhook(
   return res.json();
 }
 
-export async function sendOtp(email: string): Promise<void> {
+export async function sendOtp(email: string, name?: string): Promise<void> {
   const webhookUrl = process.env.N8N_OTP_SEND_WEBHOOK;
   if (!webhookUrl) {
     throw new Error("N8N_OTP_SEND_WEBHOOK is not configured");
   }
 
-  const result = await callN8nWebhook(webhookUrl, { email });
+  const result = await callN8nWebhook(webhookUrl, { email, name });
 
   if (result.success === false) {
     throw new Error(result.error || "Failed to send verification code");
