@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { hashPassword, setSession } from "@/lib/auth";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 import { sanitizeInput } from "@/lib/utils";
 import { z } from "zod";
-import { sendOtp } from "@/lib/n8n";
+import { verifyOtp } from "@/lib/n8n";
 
-const limiter = rateLimit({ interval: 60000, maxRequests: 5 });
+const limiter = rateLimit({ interval: 60000, maxRequests: 10 });
 
-const signupSchema = z.object({
+const verifySchema = z.object({
   name: z.string().min(2).max(100).transform(sanitizeInput),
   email: z.string().email().transform((e) => e.toLowerCase().trim()),
   phone: z
@@ -19,6 +20,9 @@ const signupSchema = z.object({
     .string()
     .min(8, "Password must be at least 8 characters")
     .max(128),
+  otp: z
+    .string()
+    .regex(/^\d{6}$/, "Verification code must be 6 digits"),
 });
 
 export async function POST(request: Request) {
@@ -27,20 +31,20 @@ export async function POST(request: Request) {
     const { allowed } = await limiter(ip);
     if (!allowed) {
       return NextResponse.json(
-        { error: "Too many signup attempts. Try again later." },
+        { error: "Too many attempts. Try again later." },
         { status: 429 }
       );
     }
 
     const body = await request.json();
-    const parsed = signupSchema.safeParse(body);
+    const parsed = verifySchema.safeParse(body);
 
     if (!parsed.success) {
       const errors = parsed.error.errors.map((e) => e.message);
       return NextResponse.json({ error: errors.join(", ") }, { status: 400 });
     }
 
-    const { email } = parsed.data;
+    const { name, email, phone, password, otp } = parsed.data;
 
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
@@ -50,14 +54,56 @@ export async function POST(request: Request) {
       );
     }
 
-    await sendOtp(email);
+    const verified = await verifyOtp(email, otp);
+
+    if (!verified) {
+      return NextResponse.json(
+        { error: "Invalid or expired verification code" },
+        { status: 400 }
+      );
+    }
+
+    const hashed = await hashPassword(password);
+
+    const user = await prisma.user.create({
+      data: {
+        name,
+        email,
+        phone: phone || null,
+        password: hashed,
+        role: "CUSTOMER",
+      },
+    });
+
+    await setSession({
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        userId: user.id,
+        action: "SIGNUP",
+        ip,
+        details: `New user registered: ${user.email}`,
+      },
+    });
 
     return NextResponse.json(
-      { message: "Verification code sent to your email" },
-      { status: 200 }
+      {
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          phone: user.phone,
+          role: user.role,
+        },
+      },
+      { status: 201 }
     );
   } catch (error) {
-    console.error("Signup error:", error);
+    console.error("Verify OTP error:", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "An unexpected error occurred" },
       { status: 500 }

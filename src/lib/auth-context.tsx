@@ -23,17 +23,20 @@ interface User {
   role: "CUSTOMER" | "SALESPERSON" | "ADMIN";
 }
 
+interface SignupData {
+  name: string;
+  email: string;
+  phone: string;
+  password: string;
+}
+
 interface AuthContextType {
   user: User | null;
   loading: boolean;
   logoutLoading: boolean;
   login: (email: string, password: string) => Promise<User>;
-  signup: (data: {
-    name: string;
-    email: string;
-    phone: string;
-    password: string;
-  }) => Promise<User>;
+  signup: (data: SignupData) => Promise<void>;
+  verifyOtp: (data: SignupData & { otp: string }) => Promise<User>;
   logout: () => Promise<void>;
   refetch: () => Promise<void>;
 }
@@ -125,15 +128,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const signup = async (data: {
-    name: string;
-    email: string;
-    phone: string;
-    password: string;
-  }): Promise<User> => {
+  const signup = async (data: SignupData): Promise<void> => {
     setLoading(true);
     try {
       const res = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error);
+    } catch (err) {
+      setLoading(false);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const verifyOtp = async (data: SignupData & { otp: string }): Promise<User> => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/auth/verify-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
@@ -165,7 +181,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, logoutLoading, login, signup, logout, refetch: fetchUser }}
+      value={{ user, loading, logoutLoading, login, signup, verifyOtp, logout, refetch: fetchUser }}
     >
       {children}
     </AuthContext.Provider>
