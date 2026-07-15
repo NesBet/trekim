@@ -89,7 +89,7 @@ export default function AdminPage() {
     <div>
       <div className="mb-8">
         <h1 className="text-3xl font-bold">Admin Overview</h1>
-        <p className="text-muted-foreground">Manage K.W Social</p>
+        <p className="text-muted-foreground">Manage Trekim Tavern</p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -157,7 +157,7 @@ export default function AdminPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>K.W Social Info</CardTitle>
+            <CardTitle>Trekim Tavern Info</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
             <div className="flex justify-between py-2 border-b">

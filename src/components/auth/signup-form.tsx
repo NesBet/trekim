@@ -202,7 +202,7 @@ export function SignupForm() {
           <GlassWater className="h-12 w-12 text-trekim-500" />
         </div>
         <CardTitle className="text-2xl">Create Account</CardTitle>
-        <CardDescription>Join K.W Social</CardDescription>
+        <CardDescription>Join Trekim Tavern</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
