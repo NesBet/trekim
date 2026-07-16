@@ -14,7 +14,7 @@ async function main() {
     create: {
       name: "Trekim Admin",
       email: "admin@trekim.co.ke",
-      phone: "+254700000000",
+      phone: "+254794249775",
       password: hashedPassword,
       role: Role.ADMIN,
     },
@@ -26,7 +26,7 @@ async function main() {
     create: {
       name: "Sales Person",
       email: "sales@trekim.co.ke",
-      phone: "+254700000001",
+      phone: "+254794249775",
       password: hashedPassword,
       role: Role.SALESPERSON,
     },
@@ -36,7 +36,7 @@ async function main() {
     where: { email: "customer@trekim.com" },
     update: {},
     create: {
-      name: "Test Customer",
+      name: "Customer One",
       email: "customer@trekim.com",
       phone: "+254700000002",
       password: hashedPassword,
