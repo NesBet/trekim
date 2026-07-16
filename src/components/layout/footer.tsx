@@ -28,7 +28,7 @@ export function Footer() {
               </div>
               <div className="flex items-center gap-2">
                 <Mail className="h-4 w-4" />
-                <span>contact@kwsocial.com</span>
+                <span>contact@trekim.com</span>
               </div>
             </div>
           </div>

@@ -38,6 +38,8 @@ export function ProductCard({
           <img
             src={product.image}
             alt={product.name}
+            loading="lazy"
+            decoding="async"
             className="h-full w-full object-cover"
           />
         ) : (
