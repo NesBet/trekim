@@ -49,6 +49,20 @@ export function Footer() {
             reserved.
           </p>
         </div>
+
+        <div className="mt-4 pt-4 border-t border-trekim-500/20 text-center text-xs text-muted-foreground">
+          <p>
+            Powered by{" "}
+            <a
+              href="https://pulsemation.vercel.app"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-trekim-500 hover:text-trekim-400 hover:underline font-medium transition-colors"
+            >
+              Pulsemation
+            </a>
+          </p>
+        </div>
       </div>
     </footer>
   );
