@@ -182,11 +182,6 @@ async function main() {
       },
     });
   }
-
-  console.log("Database seeded successfully!");
-  console.log("Admin email: admin@trekim.co.ke");
-  console.log("Salesperson email: sales@trekim.co.ke");
-  console.log("Customer email: customer@trekim.com");
 }
 
 main()
