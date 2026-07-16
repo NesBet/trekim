@@ -55,7 +55,7 @@ async function main() {
       price: 250,
       category: "Beer",
       stock: 200,
-      image: "/images/products/tusker.jpeg",
+      image: "https://greenspoon.co.ke/wp-content/uploads/2023/01/Greenspoon-1168.jpg",
     },
     {
       name: "White Cap Lager",
@@ -63,7 +63,7 @@ async function main() {
       price: 230,
       category: "Beer",
       stock: 150,
-      image: "/images/products/whitecap.jpg",
+      image: "https://greenspoon.co.ke/wp-content/uploads/2023/12/Greenspoon-1181-1400x906.jpg",
     },
     {
       name: "Johnnie Walker Black Label",
@@ -71,7 +71,7 @@ async function main() {
       price: 3500,
       category: "Whisky",
       stock: 50,
-      image: "/images/products/johnnie-black.jpg",
+      image: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQaa4tZ1xWQ8uBISHu7WweWinIa5iert2FEaNQ48LlkJinSOMVRIWV-UeM&s=10",
     },
     {
       name: "Jameson Irish Whiskey",
@@ -79,7 +79,7 @@ async function main() {
       price: 2800,
       category: "Whisky",
       stock: 40,
-      image: "/images/products/jameson.jpg",
+      image: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRLGI0wdWLOQzAYgb5j8029e_PVqF5FyfO-e1d84_qdJxdfgvWTUnf8Lyfz&s=10",
     },
     {
       name: "Smirnoff Vodka 750ml",
@@ -87,7 +87,7 @@ async function main() {
       price: 1500,
       category: "Vodka",
       stock: 80,
-      image: "/images/products/smirnoff.jpg",
+      image: "https://greenspoon.co.ke/wp-content/uploads/2022/07/Greenspoon-Kenya-Smirnoff-Vodka-2-1400x933.jpg",
     },
     {
       name: "Chivas Regal 12yr",
@@ -95,7 +95,7 @@ async function main() {
       price: 4000,
       category: "Whisky",
       stock: 30,
-      image: "/images/products/chivas.jpg",
+      image: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRQKbl5kLCA-VvwcReA8VN62zbjh0WQGqb40dUPQSb4m0tgk1jUfVsXemo&s=10",
     },
     {
       name: "Baileys Irish Cream",
@@ -104,7 +104,7 @@ async function main() {
       price: 2200,
       category: "Liqueur",
       stock: 45,
-      image: "/images/products/baileys.jpg",
+      image: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRxrKyy0bC9Mk0w9ln3Hvu4b5v0msBd9LKmDqLzL_4uzP3T9NZL2nPqy7Q&s=10",
     },
     {
       name: "Heineken",
@@ -112,7 +112,7 @@ async function main() {
       price: 280,
       category: "Beer",
       stock: 180,
-      image: "/images/products/heineken.jpg",
+      image: "https://greenspoon.co.ke/wp-content/uploads/2024/05/Greenspoon-1202-1400x933.jpg",
     },
     {
       name: "Captain Morgan Spiced Rum",
@@ -120,7 +120,7 @@ async function main() {
       price: 1800,
       category: "Rum",
       stock: 60,
-      image: "/images/products/captain-morgan.jpg",
+      image: "https://lovescotch.com/cdn/shop/products/Captain_Morgan_Original_Spiced_Rum_LoveScotch_6_grande.png?v=1756515088",
     },
     {
       name: "Cîroc Vodka",
@@ -128,7 +128,7 @@ async function main() {
       price: 3200,
       category: "Vodka",
       stock: 25,
-      image: "/images/products/ciroc.jpg",
+      image: "https://sizzleliquors.co.ke/wp-content/uploads/2023/11/Ciroc-Vodka.jpg",
     },
     {
       name: "Guinness Foreign Extra",
@@ -136,7 +136,7 @@ async function main() {
       price: 300,
       category: "Beer",
       stock: 160,
-      image: "/images/products/guinness.jpg",
+      image: "https://greenspoon.co.ke/wp-content/uploads/2023/02/Greenspoon-1193.jpg",
     },
     {
       name: "Jägermeister",
@@ -144,7 +144,7 @@ async function main() {
       price: 2000,
       category: "Liqueur",
       stock: 35,
-      image: "/images/products/jager.jpg",
+      image: "https://greenspoon.co.ke/wp-content/uploads/2022/07/Greenspoon-Kenya-Jagermerister-1.jpg",
     },
     {
       name: "Glenfiddich 12yr",
@@ -152,7 +152,7 @@ async function main() {
       price: 5500,
       category: "Whisky",
       stock: 20,
-      image: "/images/products/glenfiddich.jpg",
+      image: "https://greenspoon.co.ke/wp-content/uploads/2022/06/Greenspoon-Glenfiddich-12-Year.jpg",
     },
     {
       name: "Absolut Vodka",
@@ -160,7 +160,7 @@ async function main() {
       price: 1600,
       category: "Vodka",
       stock: 70,
-      image: "/images/products/absolut.jpg",
+      image: "https://greenspoon.co.ke/wp-content/uploads/2022/07/Screenshot-2026-04-23-at-14.55.12-3-720x480.jpg",
     },
     {
       name: "Amarula Cream",
@@ -168,7 +168,15 @@ async function main() {
       price: 1800,
       category: "Liqueur",
       stock: 40,
-      image: "/images/products/amarula.jpg",
+      image: "https://greenspoon.co.ke/wp-content/uploads/2022/07/Greenspoon-Kenya-Amarula.jpg",
+    },
+    {
+      name: "Konyangi 500ml",
+      description: "Konyagi is an iconic Tanzanian cane spirit. Distilled from sugarcane and molasses, it offers a distinct, versatile flavor profile with citrus, spice, and tropical fruit notes.",
+      price: 550,
+      category: "Spirit",
+      stock: 25,
+      image: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTiKD8ns2r3_5olzjpw3XT3teQ950vTRlImhZQjgjAjblr5k-tmULzO1ZXw&s=10",
     },
   ];
 
