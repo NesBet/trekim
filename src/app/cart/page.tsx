@@ -258,7 +258,7 @@ function CartContent() {
               loading={loading}
             >
               <CreditCard className="mr-2 h-5 w-5" />
-              Pay with Card or Mobile Money
+              Proceed to Payment
             </Button>
             <Link href="/inventory">
               <Button variant="ghost" className="w-full mt-2">

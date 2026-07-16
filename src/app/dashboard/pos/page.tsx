@@ -511,10 +511,10 @@ export default function POSPage() {
                 ) : paymentMethod === "MOBILE" ? (
                   <>
                     <CreditCard className="mr-2 h-5 w-5" />
-                    Proceed to payment
+                    Proceed to Payment
                   </>
                 ) : (
-                  "Proceed to payment"
+                  "Proceed to Payment"
                 )}
               </Button>
             </CardContent>
