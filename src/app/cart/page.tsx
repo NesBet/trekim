@@ -105,6 +105,7 @@ function CartContent() {
 
       localStorage.removeItem("trekim_cart");
       setItems([]);
+      window.dispatchEvent(new Event("cart-updated"));
 
       const payRes = await fetch("/api/paystack/initialize", {
         method: "POST",
