@@ -118,7 +118,7 @@ export async function initializeTransaction(params: {
       amount: amountInKobo,
       reference: params.reference,
       metadata: params.metadata,
-      channels: ["card", "mobile_money", "bank", "ussd", "qr"],
+      channels: ["card", "mobile_money", "bank", "ussd", "bank_transfer"],
       callback_url: `${BASE_URL}/payment/callback`,
     }),
   });
