@@ -1,4 +1,4 @@
-# Trekim Tavern
+# Trekim Tavern - Haven of Peace
 
 A full-featured e-commerce and point-of-sale platform for **Trekim Tavern**, a premium drinks lounge located along Magadi Road in Kiserian, Kenya. Built with Next.js 15, Prisma 7, PostgreSQL, and Tailwind CSS.
 
